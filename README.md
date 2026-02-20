@@ -1,5 +1,5 @@
 # BSPX - B-Splines in JAX
-> Fast, differentiable B-splines in JAX with de Boor evaluation.
+> Efficient, differentiable B-splines in JAX with [De Boor's](https://en.wikipedia.org/wiki/De_Boor%27s_algorithm) algorithm.
 
 ## Features
 - JAX-traceable De Boor implementation - completely sparse
