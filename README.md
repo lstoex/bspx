@@ -5,6 +5,7 @@
 - JAX-traceable De Boor implementation - completely sparse
 - Jitable, vmapable, etc.
 - Compile-time precomputation for minimal FLOPS
+- Transparent shapes and types with Jaxtyping
 
 ## Quick start
 ```python
@@ -16,6 +17,8 @@ curve = b(P)
 ```
 
 We always use clamped knots, so that the curves coincide with the first and last control point.
+
+**To enable beartype, have a look at `src/bspx/__init__.py`**
 
 ## Notation
 | Symbol | Description |
