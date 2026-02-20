@@ -1,0 +1,45 @@
+[project]
+name = "bspx"
+version = "0.1.0"
+description = "BSplines in JAX for trajectory optimization."
+readme = "README.md"
+authors = [
+    { name = "Lennard Stoellger", email = "Lennard.Stoellger@tum.de" },
+]
+requires-python = ">=3.13"
+dependencies = [
+    "beartype>=0.22.9",
+    "equinox>=0.13.2",
+    # JAX: CPU on macOS
+    "jax; platform_system == 'Darwin'",
+    "jax[cuda13]; platform_system != 'Darwin'",
+    "jaxtyping>=0.3.5",
+    "numpy>=2.4.1",
+    "plotly>=6.5.2",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.26,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+    "jupyter>=1.1.1",
+    "pytest>=9.0.2",
+    "ty>=0.0.12",
+    "ruff>=0.14.14",
+    "marimo>=0.19.6",
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["I", "E", "F", "W"]
+ignore = ["F722"]
+
+[tool.ty.src]
+# Remove `build` from the excluded directories.
+include = ["src/", "test/"]
+exclude = [".venv/"]

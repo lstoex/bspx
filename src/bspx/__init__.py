@@ -1,0 +1,10 @@
+"""Top-level package for bspx."""
+
+from jaxtyping import install_import_hook
+
+with install_import_hook("bspx", "beartype.beartype"):
+    from .bsplines import BSpline
+    from .utils_static import get_knots_static
+
+__all__ = ("BSpline", "get_knots_static")
+__version__ = "0.0.0"
