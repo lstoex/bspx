@@ -9,11 +9,10 @@
 
 ## Quick start
 ```python
-from bspx import BSpline
+from bspx import bspline
 
 P = jnp.array([0., 1., 1., 2., 4., 2. , 3.])
-b = BSpline(n_output=42, order=4)
-curve = b(P)
+curve = bspline(P, n_output=42, order=4)
 ```
 
 We always use clamped knots, so that the curves coincide with the first and last control point.

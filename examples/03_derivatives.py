@@ -5,8 +5,17 @@ import plotly.graph_objects as go
 
 from bspx import bspline
 from functools import partial
+from typing import Optional, Union
 
 # %%
+from IPython.display import display, HTML
+import plotly
+plotly.offline.init_notebook_mode()
+display(
+    HTML(
+        '<script type="text/javascript" async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_SVG"></script>'
+    )
+)
 P = jnp.array([[0.0, 0.0], [1.0, 2.0], [2.0, 2.0], [3.0, 0.0], [4.0, -1.0]])
 
 # 64 output points, cubic B-spline (order 4 - 1 = degree 3)
@@ -14,11 +23,19 @@ b = partial(bspline, n_output=64, order=4, use_static=False)
 curve_points = b(P)
 
 fig = go.Figure()
-fig.add_trace(go.Scatter(x=curve_points[:, 0], y=curve_points[:, 1], mode="lines+markers", name="B-spline Curve"))
-fig.add_trace(go.Scatter(x=P[:, 0], y=P[:, 1], mode="lines+markers", name="Control Points", line=dict(dash="dash")))
-fig.update_layout(title="B-spline Curve and Control Points", xaxis_title="x", yaxis_title="y", legend_title="Legend")
+fig.add_trace(go.Scatter(x=curve_points[:, 0], y=curve_points[:, 1], mode="lines+markers", name=r'$C(t)$'))
+fig.add_trace(go.Scatter(x=P[:, 0], y=P[:, 1], mode="lines+markers", name=r"$P$", line=dict(dash="dash")))
+fig.update_layout(title="B-spline Curve and Control Points", xaxis_title="x", yaxis_title="y")
 fig.show()
-
+#%%
+from bspx.bsplines import bspline_derivative
+derivatives = bspline_derivative(P, 4, n_output=64, use_static=False, derivative_order=3, emit_intermediates=True)
+fig = go.Figure()
+for i, d in enumerate(derivatives):
+    name = r"$C" + "'" * (i + 1) + r"$"
+    fig.add_trace(go.Scatter(x=d[:, 0], y=d[:, 1], mode="lines+markers", name=name))
+fig.update_layout(title="B-spline Derivatives", xaxis_title="x", yaxis_title="y")
+fig.show()
 # %%
 # Test differentiability of the curve w.r.t. control points.
 # Start from a flat curve and optimize to match the target shape.
@@ -54,6 +71,7 @@ for i in range(iters):
 
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=b(P_opt)[:, 0], y=b(P_opt)[:, 1], mode="lines+markers", name="Optimized B-spline Curve"))
+fig.add_trace(go.Scatter(x=b(P_start)[:, 0], y=b(P_start)[:, 1], mode="lines+markers", name="Initial B-spline Curve", line=dict(dash="dash")))
 fig.add_trace(
     go.Scatter(x=P_target[:, 0], y=P_target[:, 1], mode="lines+markers", name="Target Points", line=dict(dash="dash"))
 )
@@ -117,4 +135,33 @@ fig.add_trace(
     )
 )
 fig.update_layout(title="Compensated B-spline Curve", xaxis_title="x", yaxis_title="y", legend_title="Legend")
+fig.show()
+
+# %%
+#visualize how for one update step the control points move.
+fig = go.Figure()
+P = P_opt
+fig.add_trace(go.Scatter(x=b(P)[:, 0], y=b(P)[:, 1], mode="lines+markers", name="B-spline Curve"))
+P_disturbed = P_disturbed
+fig.add_trace(go.Scatter(x=P[:, 0], y=P[:, 1], mode="markers", name="Original Control Points", line=dict(dash="dash")))
+fig.add_trace(go.Scatter(x=disturbed_curve[:, 0], y=disturbed_curve[:, 1], mode="lines+markers", name="Disturbed B-spline Curve", line=dict(dash="dash")))
+correction, _ = disturbance_step(P, lr=0.5)
+for i in range(len(P)):
+    #make arrows
+    fig.add_annotation(
+        x=correction[i, 0],
+        y=correction[i, 1],
+        ax=P[i, 0],
+        ay=P[i, 1],
+        xref="x",
+        yref="y",
+        axref="x",
+        ayref="y",
+        showarrow=True,
+        arrowhead=3,
+        arrowsize=1,
+        arrowwidth=2,
+        arrowcolor="red",
+    )
+fig.update_layout(title="Control Point Corrections", xaxis_title="x", yaxis_title="y", legend_title="Legend")
 fig.show()
