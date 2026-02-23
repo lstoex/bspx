@@ -56,7 +56,7 @@ def precompute_aligned_alphas(
     js = get_indices_static(n, k, ts)  # precompute for n_points
     alphas = [get_alphas_static(k, j, T, t) for j, t in zip(js, ts)]
     alphas_i = alphas[0]  # all elements have the same shape, so we can just take the first one to get the shape
-    max_alpha_len = max(len(alpha) for alpha in alphas_i)
+    max_alpha_len = max(len(alpha) for alpha in alphas_i) if alphas_i else 0
     alphas_padded = []
     for i, a in enumerate(alphas):
         alphas_padded.append([np.concatenate([a_, np.inf * np.ones((max_alpha_len - len(a_),))]) for a_ in a])
