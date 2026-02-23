@@ -1,13 +1,15 @@
-#%%
+# %%
+from functools import partial
+
 import jax  # noqa: F401
 import jax.numpy as jnp
 import numpy as np  # noqa: F401
 import plotly.graph_objects as go  # noqa: F401
 
-from bspx import BSpline
+from bspx import bspline
 
 
-#%%
+# %%
 def timeit(func, *args, **kwargs):
     import time
 
@@ -34,26 +36,22 @@ def timeit(func, *args, **kwargs):
 
 
 # Time the static version
-b_static = BSpline(128, 4, use_static=True)
+# b_static = BSpline(128, 4, use_static=True)
+b_static = partial(bspline, n_output=128, order=4, use_static=True)
+b_dynamic = partial(bspline, n_output=128, order=4, use_static=False)
+
 P = jnp.array([[0.0, 0.0], [1.0, 2.0], [2.0, 2.0], [3.0, 0.0], [4.0, -1.0]])
 
-def static_variant(P):
-    return b_static(P)
+print("Timing static version...")
+timeit(b_static, P, n_runs=1000)
 
-def dynamic_variant(P):
-    return b_dynamic(P)
+print("Timing dynamic version...")
+timeit(b_dynamic, P, n_runs=1000)
 
-timeit(static_variant, P, n_runs=1000)
-# Time the dynamic version
-b_dynamic = BSpline(128, 4, use_static=False)
-timeit(dynamic_variant, P, n_runs=1000)
-
-#%%
+# %%
 # compare number of flops
 n_flops_static = b_static.__call__.lower(b_static, P).compile().cost_analysis()["flops"]
 n_flops_dynamic = b_dynamic.__call__.lower(b_dynamic, P).compile().cost_analysis()["flops"]
 print(f"Static version flops: {n_flops_static}")
 print(f"Dynamic version flops: {n_flops_dynamic}")
-print(
-    f"Static version is {n_flops_dynamic / n_flops_static:.2f} times more efficient in terms of flops"
-)
+print(f"Static version is {n_flops_dynamic / n_flops_static:.2f} times more efficient in terms of flops")

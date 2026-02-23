@@ -1,6 +1,7 @@
 """Variant of De Boor's algorithm for evaluating B-spline curves, with a compile-time precomputation."""
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float
 
@@ -35,17 +36,18 @@ def de_boor_static(P: Float[Array, "np1 d"], k: int, n_points: int) -> Float[Arr
     return jax.vmap(blend, in_axes=(0, 0, None))(js, alphas_padded, P)
 
 
-def de_boor(P: Float[Array, "np1 d"], k: int, ts: Float[Array, " n_points"]) -> Float[Array, " n_points d"]:
+def de_boor(P: Float[Array, "np1 d"], k: int, n_points: int) -> Float[Array, " n_points d"]:
     """
     Evaluate a B-spline curve at the given parameter values ts.
     This version computes the blending weights at runtime, so it can handle dynamic t values.
     Args:
     P: control points, shape (n+1, d)
     k: order of the B-spline
-    ts: parameter values to evaluate at, shape (n_points,)
+    n_points: number of points to evaluate on the curve
     """
     n = P.shape[0] - 1
     T = make_uniform_knot_vector(n, k)
+    ts = jnp.linspace(0.0, 1.0, n_points)
 
     def blend(t, P):
         j = get_indices(n, k, t)

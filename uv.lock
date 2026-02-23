@@ -165,7 +165,6 @@ name = "bspx"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "beartype" },
     { name = "equinox" },
     { name = "jax" },
     { name = "jax", extra = ["cuda13"], marker = "sys_platform != 'darwin'" },
@@ -176,6 +175,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "beartype" },
     { name = "ipykernel" },
     { name = "jupyter" },
     { name = "marimo" },
@@ -186,7 +186,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "beartype", specifier = ">=0.22.9" },
     { name = "equinox", specifier = ">=0.13.2" },
     { name = "jax", marker = "sys_platform == 'darwin'" },
     { name = "jax", extras = ["cuda13"], marker = "sys_platform != 'darwin'" },
@@ -197,6 +196,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "beartype", specifier = ">=0.22.9" },
     { name = "ipykernel", specifier = ">=7.1.0" },
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "marimo", specifier = ">=0.19.6" },

@@ -7,8 +7,8 @@ from jaxtyping import install_import_hook
 #     from .bsplines import BSpline
 #     from .utils_static import get_knots_static
 ###---------------Use this for no runtime type checking (faster) --------
-from .bsplines import BSpline
+from .bsplines import bspline
 from .utils_static import get_knots_static
 
-__all__ = ("BSpline", "get_knots_static")
+__all__ = ("bspline", "get_knots_static")
 __version__ = "0.0.0"

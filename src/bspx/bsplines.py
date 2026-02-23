@@ -1,28 +1,23 @@
 """A module for evaluating B-spline curves using de Boor's algorithm. This is where the user interface lives."""
 
-import equinox as eqx
 import jax
-import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from .deboor import de_boor, de_boor_static
 
 
-class BSpline(eqx.Module):
-    """B-Spline curve evaluator"""
-    n_output: int = eqx.field(static=True)  # number of points to evaluate on the curve
-    order: int = eqx.field(static=True, default=4)  # default to cubic B-splines
-    use_static: bool = eqx.field(
-        static=True, default=True
-    )  # whether to use the static version of de Boor's algorithm for maximum efficiency.
-
-    @jax.jit
-    def __call__(self, control_points: Float[Array, "n_in d"]) -> Float[Array, "n_output d"]:
-        if self.use_static:
-            return de_boor_static(control_points, self.order, self.n_output)
-        else:
-            ts = jnp.linspace(0.0, 1.0, self.n_output)
-            return de_boor(control_points, self.order, ts)
-
-    def __str__(self):
-        return f"BSpline(n_output={self.n_output}, order={self.order}, use_static={self.use_static})"
+@jax.jit(static_argnames=["order", "use_static", "n_output"])
+def bspline(
+    control_points: Float[Array, "n_in d"], n_output: int, order: int = 4, use_static: bool = True
+) -> Float[Array, "n_output d"]:
+    """Evaluate a B-spline curve using de Boor's algorithm.
+    Args:
+        control_points: An array of shape (n_in, d) representing the control points of the B-spline curve.
+        n_output: The number of output points to generate on the B-spline curve.
+        order: The order of the B-spline curve (default is 4 for cubic).
+        use_static: Whether to use the static version of de Boor's algorithm (default is True).
+    Returns:
+        An array of shape (n_output, d) representing the points on the B-spline curve.
+    """
+    alg = de_boor_static if use_static else de_boor
+    return alg(control_points, order, n_output)

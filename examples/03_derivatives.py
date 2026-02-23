@@ -3,13 +3,14 @@ import jax
 import jax.numpy as jnp
 import plotly.graph_objects as go
 
-from bspx import BSpline
+from bspx import bspline
+from functools import partial
 
 # %%
 P = jnp.array([[0.0, 0.0], [1.0, 2.0], [2.0, 2.0], [3.0, 0.0], [4.0, -1.0]])
 
 # 64 output points, cubic B-spline (order 4 - 1 = degree 3)
-b = BSpline(64, 4, use_static=False)
+b = partial(bspline, n_output=64, order=4, use_static=False)
 curve_points = b(P)
 
 fig = go.Figure()
@@ -24,7 +25,7 @@ fig.show()
 
 P_start = jnp.array([[0.0, 0.0], [1.0, 0.0], [2.0, 0.0], [3.0, 0.0], [4.0, 0.0]])
 P_target = P
-b = BSpline(64, 4, use_static=True)
+b = partial(bspline, n_output=64, order=4, use_static=False)
 
 
 def loss_fn(P):
