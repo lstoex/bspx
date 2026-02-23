@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 from scipy.interpolate import BSpline as SciPyBSpline
 
-from bspx.bsplines import bspline
+from bspx import bspline, bspline_derivative
 
 
 @pytest.mark.parametrize(
@@ -46,6 +46,7 @@ def test_bspline_against_scipy(n_in, order, n_output, static):
         # Compare results
         np.testing.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
 
+
 @pytest.mark.parametrize(
     "n_in, order, n_output, static, derivative_order",
     [
@@ -54,24 +55,32 @@ def test_bspline_against_scipy(n_in, order, n_output, static):
         (6, 5, 15, True, 2),  # quartic B-spline second derivative
         (6, 5, 15, False, 2),  # quartic B-spline second derivative with use_static=False
         (5, 4, 20, False, 3),  # cubic B-spline third derivative (should be piecewise constant)
-        (5, 4, 20, True, 4), # cubic B-spline fourth derivative (should throw an error since it's not defined)
+        (5, 4, 20, True, 4),  # cubic B-spline fourth derivative (should throw an error since it's not defined)
     ],
 )
 def test_bspline_derivative_against_scipy(n_in, order, n_output, static, derivative_order):
     if derivative_order >= order:
         with pytest.raises(AssertionError):
             control_points = np.random.rand(n_in + 1, 2)  # 2D control points
-            from bspx.bsplines import bspline_derivative
 
-            bspline_derivative(jnp.array(control_points), order=order, n_output=n_output, use_static=static, derivative_order=derivative_order)
+            bspline_derivative(
+                jnp.array(control_points),
+                order=order,
+                n_output=n_output,
+                use_static=static,
+                derivative_order=derivative_order,
+            )
     else:
         # Create random control points
         control_points = np.random.rand(n_in + 1, 2)  # 2D control points
 
-        # Create our B-spline derivative and evaluate
-        from bspx.bsplines import bspline_derivative
-
-        result = bspline_derivative(jnp.array(control_points), order=order, n_output=n_output, use_static=static, derivative_order=derivative_order)
+        result = bspline_derivative(
+            jnp.array(control_points),
+            order=order,
+            n_output=n_output,
+            use_static=static,
+            derivative_order=derivative_order,
+        )
 
         # Create SciPy B-spline and evaluate its derivative
         k = order
