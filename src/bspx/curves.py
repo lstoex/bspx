@@ -29,6 +29,7 @@ def bspline(
         return de_boor(control_points, order, ts)
 
 
+@jax.jit(static_argnames=["order", "use_static", "n_output", "derivative_order", "emit_intermediates"])
 def bspline_derivative(
     control_points: Float[Array, "n_in d"],
     order: int,
