@@ -83,7 +83,7 @@ def get_alphas(k: int, j: Int[Array, ""], T: Float[Array, "..."], t: Float[Array
     return alphas
 
 
-def get_indices(n: int, k: int, t: Float[Array, "..."]) -> Int[Array, "..."]:
+def get_indices_uniform(n: int, k: int, t: Float[Array, "..."]) -> Int[Array, "..."]:
     """Compute the knot span index j for a uniform clamped knot vector.
     For uniform knots the interior spans are evenly spaced, so j is just a scaled floor.
     The clamped knot vector has k repeated knots at each end, so valid span indices run from k-1 to n (inclusive).
@@ -91,4 +91,16 @@ def get_indices(n: int, k: int, t: Float[Array, "..."]) -> Int[Array, "..."]:
     n_spans = n - k + 2
     raw = jnp.floor(t * n_spans).astype(jnp.int32)
     j = jnp.clip(raw + (k - 1), k - 1, n)
+    return j
+
+
+def get_indices_nonuniform(n: int, T: Float[Array, " mp1"], t: Float[Array, "..."]) -> Int[Array, "..."]:
+    """Compute the knot span index j for a non-uniform knot vector T and parameter t."""
+    # For each t, find the largest j such that T[j] <= t. This is the knot span index.
+    # We can use jnp.searchsorted for this, but we need to handle the case where t == T[-1].
+    m = T.shape[0] - 1
+    k = m - n  # order of the B-spline
+    j = jnp.searchsorted(T, t, side="right") - 1
+    # Clamp to valid range [k-1, n]
+    j = jnp.clip(j, k - 1, n)
     return j
