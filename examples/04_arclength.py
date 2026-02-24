@@ -1,5 +1,4 @@
 # %%
-import trace
 import jax
 import jax.numpy as jnp
 import plotly.graph_objects as go

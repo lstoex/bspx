@@ -9,6 +9,15 @@ from .utils import get_alphas, get_indices, get_relevant_points, make_uniform_kn
 from .utils_static import precompute_aligned_alphas
 
 
+def _blend(d, k, alphas):
+    """Perform the de Boor blending stages. Shared by static and dynamic variants."""
+    for r_ in range(1, k):
+        for i in range(k - 1, r_ - 1, -1):  # reverse order to avoid overwriting needed values
+            alpha = alphas[r_ - 1][i - r_]
+            d = d.at[i].set((1.0 - alpha) * d[i - 1] + alpha * d[i])
+    return d[k - 1]
+
+
 def de_boor_static(P: Float[Array, "np1 d"], k: int, ts: Float[np.ndarray, " n_points"]) -> Float[Array, " n_points d"]:
     """
     Evaluate a B-spline curve at n_points uniformly spaced parameter values in [0, 1].
@@ -16,22 +25,15 @@ def de_boor_static(P: Float[Array, "np1 d"], k: int, ts: Float[np.ndarray, " n_p
     Args:
     P: control points, shape (n+1, d)
     k: order of the B-spline
-    t: parameter values to evaluate at, shape (n_points,)
+    ts: parameter values to evaluate at, shape (n_points,)
     """
     with jax.ensure_compile_time_eval():
         n = P.shape[0] - 1
         alphas_padded, js = precompute_aligned_alphas(n, k, ts)
 
-    # we only need to do the blending at runtime using the precomputed alphas and indices.
     def blend(j, a, P):
         d = get_relevant_points(j, P, k)
-        for r_ in range(1, k):  # blending stages
-            for i in range(
-                k - 1, r_ - 1, -1
-            ):  # blend in reverse order to avoid overwriting points we still need to read.
-                alpha = a[r_ - 1, i - r_]
-                d = d.at[i].set((1.0 - alpha) * d[i - 1] + alpha * d[i])
-        return d[k - 1]
+        return _blend(d, k, a)
 
     return jax.vmap(blend, in_axes=(0, 0, None))(js, alphas_padded, P)
 
@@ -43,7 +45,7 @@ def de_boor(P: Float[Array, "np1 d"], k: int, ts: Float[Array, " n_points"]) -> 
     Args:
     P: control points, shape (n+1, d)
     k: order of the B-spline
-    t: parameter values to evaluate at, shape (n_points,)
+    ts: parameter values to evaluate at, shape (n_points,)
     """
     n = P.shape[0] - 1
     T = make_uniform_knot_vector(n, k)
@@ -52,13 +54,7 @@ def de_boor(P: Float[Array, "np1 d"], k: int, ts: Float[Array, " n_points"]) -> 
         j = get_indices(n, k, t)
         a = get_alphas(k, j, T, t)
         d = get_relevant_points(j, P, k)
-        for r_ in range(1, k):  # blending stages
-            for i in range(
-                k - 1, r_ - 1, -1
-            ):  # blend in reverse order to avoid overwriting points we still need to read.
-                alpha = a[r_ - 1][i - r_]
-                d = d.at[i].set((1.0 - alpha) * d[i - 1] + alpha * d[i])
-        return d[k - 1]
+        return _blend(d, k, a)
 
     return jax.vmap(blend, in_axes=(0, None))(ts, P)
 
@@ -80,5 +76,7 @@ def diff_spline(
     n = P.shape[0] - 1
     Q = jnp.diff(P, axis=0) * (k - 1)
     denom = T[k : n + k] - T[1 : n + 1]
-    Q = jnp.where(jnp.allclose(denom, 0.0), 0.0, Q / denom[:, None])
+    zero_mask = jnp.abs(denom) < 1e-10
+    safe_denom = jnp.where(zero_mask, 1.0, denom)
+    Q = jnp.where(zero_mask[:, None], 0.0, Q / safe_denom[:, None])
     return Q, k - 1, T[1:-1]

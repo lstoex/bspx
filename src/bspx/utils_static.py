@@ -59,5 +59,5 @@ def precompute_aligned_alphas(
     max_alpha_len = max(len(alpha) for alpha in alphas_i) if alphas_i else 0
     alphas_padded = []
     for i, a in enumerate(alphas):
-        alphas_padded.append([np.concatenate([a_, np.inf * np.ones((max_alpha_len - len(a_),))]) for a_ in a])
+        alphas_padded.append([np.concatenate([a_, np.nan * np.ones((max_alpha_len - len(a_),))]) for a_ in a])
     return np.array(alphas_padded), js

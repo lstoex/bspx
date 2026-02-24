@@ -32,21 +32,23 @@ def bspline(
 @jax.jit(static_argnames=["order", "use_static", "n_output", "derivative_order", "emit_intermediates"])
 def bspline_derivative(
     control_points: Float[Array, "n_in d"],
-    order: int,
     n_output: int,
-    use_static=False,
+    order: int = 4,
+    use_static: bool = True,
     derivative_order: int = 1,
-    emit_intermediates=False,
+    emit_intermediates: bool = False,
 ) -> list[Float[Array, "n_output d"]] | Float[Array, "n_output d"]:
     """Evaluate the derivative of a B-spline curve using de Boor's algorithm.
     Args:
         control_points: An array of shape (n_in, d) representing the control points of the B-spline curve.
-        order: The order of the B-spline curve (default is 4 for cubic).
         n_output: The number of output points to generate on the B-spline curve.
-        use_static: Whether to use the static version of de Boor's algorithm (default is False).
+        order: The order of the B-spline curve (default is 4 for cubic).
+        use_static: Whether to use the static version of de Boor's algorithm (default is True).
         derivative_order: The order of the derivative to compute (default is 1 for first derivative).
+        emit_intermediates: Whether to return all intermediate derivatives (default is False).
     Returns:
         An array of shape (n_output, d) representing the points on the derivative of the B-spline curve.
+        If emit_intermediates is True, returns a list of arrays for each derivative order.
     """
     from .deboor import diff_spline
     from .utils import make_uniform_knot_vector

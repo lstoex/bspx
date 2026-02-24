@@ -29,7 +29,7 @@ fig.add_trace(go.Scatter(x=P[:, 0], y=P[:, 1], mode="lines+markers", name=r"$P$"
 fig.update_layout(title="B-spline Curve and Control Points", xaxis_title="x", yaxis_title="y")
 fig.show()
 # %%
-derivatives = bspline_derivative(P, 4, n_output=64, use_static=False, derivative_order=3, emit_intermediates=True)
+derivatives = bspline_derivative(P, n_output=64, order=4, use_static=False, derivative_order=3, emit_intermediates=True)
 fig = go.Figure()
 for i, d in enumerate(derivatives):
     name = r"$C" + "'" * (i + 1) + r"$"
