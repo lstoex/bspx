@@ -88,5 +88,5 @@ def diff_spline(
     n = P.shape[0] - 1
     Q = jnp.diff(P, axis=0) * (k - 1)
     denom = T[k : n + k] - T[1 : n + 1]
-    Q = jnp.where(jnp.allclose(denom, 0.0), 0.0, Q / denom[:, None])
+    Q = jnp.where(jnp.isclose(denom, 0.0), 0.0, Q / denom[:, None])
     return Q, k - 1, T[1:-1]
