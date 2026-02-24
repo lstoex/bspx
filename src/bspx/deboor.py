@@ -5,21 +5,28 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float
 
-from .utils import get_alphas, get_indices, get_relevant_points, make_uniform_knot_vector
+from .utils import (
+    get_alphas,
+    get_indices_uniform,
+    get_relevant_points,
+    make_uniform_knot_vector,
+    get_indices_nonuniform,
+)
 from .utils_static import precompute_aligned_alphas
 
 
-def de_boor_static(P: Float[Array, "np1 d"], k: int, ts: Float[np.ndarray, " n_points"]) -> Float[Array, " n_points d"]:
+def de_boor_static(P: Float[Array, "np1 d"], k: int, n_points: int) -> Float[Array, " {n_points} d"]:
     """
     Evaluate a B-spline curve at n_points uniformly spaced parameter values in [0, 1].
     Computes as much as possible at compile time for maximum performance when t values are known at compile time.
     Args:
     P: control points, shape (n+1, d)
     k: order of the B-spline
-    t: parameter values to evaluate at, shape (n_points,)
+    n_points: number of points to evaluate at
     """
     with jax.ensure_compile_time_eval():
         n = P.shape[0] - 1
+        ts = np.linspace(0, 1, n_points)
         alphas_padded, js = precompute_aligned_alphas(n, k, ts)
 
     # we only need to do the blending at runtime using the precomputed alphas and indices.
@@ -36,20 +43,21 @@ def de_boor_static(P: Float[Array, "np1 d"], k: int, ts: Float[np.ndarray, " n_p
     return jax.vmap(blend, in_axes=(0, 0, None))(js, alphas_padded, P)
 
 
-def de_boor(P: Float[Array, "np1 d"], k: int, ts: Float[Array, " n_points"]) -> Float[Array, " n_points d"]:
+def de_boor(P: Float[Array, "np1 d"], k: int, n_points: int) -> Float[Array, " n_points d"]:
     """
     Evaluate a B-spline curve at the given parameter values ts.
     This version computes the blending weights at runtime, so it can handle dynamic t values.
     Args:
     P: control points, shape (n+1, d)
     k: order of the B-spline
-    t: parameter values to evaluate at, shape (n_points,)
+    n_points: number of points to evaluate at
     """
     n = P.shape[0] - 1
     T = make_uniform_knot_vector(n, k)
+    ts = jnp.linspace(0, 1, n_points)
 
     def blend(t, P):
-        j = get_indices(n, k, t)
+        j = get_indices_uniform(n, k, t)
         a = get_alphas(k, j, T, t)
         d = get_relevant_points(j, P, k)
         for r_ in range(1, k):  # blending stages

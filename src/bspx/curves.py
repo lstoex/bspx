@@ -22,11 +22,9 @@ def bspline(
         An array of shape (n_output, d) representing the points on the B-spline curve.
     """
     if use_static:
-        ts = np.linspace(0.0, 1.0, n_output)
-        return de_boor_static(control_points, order, ts)
+        return de_boor_static(control_points, order, n_output)
     else:
-        ts = jnp.linspace(0.0, 1.0, n_output)
-        return de_boor(control_points, order, ts)
+        return de_boor(control_points, order, n_output)
 
 
 @jax.jit(static_argnames=["order", "use_static", "n_output", "derivative_order", "emit_intermediates"])
@@ -58,9 +56,9 @@ def bspline_derivative(
 
     def assemble(Q, k_, T):
         return (
-            de_boor_static(Q, k_, np.linspace(0.0, 1.0, n_output))
+            de_boor_static(Q, k_, n_output)
             if use_static
-            else de_boor(Q, k_, jnp.linspace(0.0, 1.0, n_output))
+            else de_boor(Q, k_, n_output)
         )
 
     out = []
