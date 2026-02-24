@@ -4,6 +4,8 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Int
 
+from .utils_static import get_knots_static
+
 
 def make_uniform_knot_vector(n: int, k: int) -> Float[Array, " {n+k+1}"]:
     """
@@ -18,42 +20,7 @@ def make_uniform_knot_vector(n: int, k: int) -> Float[Array, " {n+k+1}"]:
     The interior knots are uniformly spaced in (0, 1).
     Number of interior knots = n + 1 - k  (zero when n+1 == k, i.e. Bezier).
     """
-    assert n + 1 >= k, "Need at least k control points for order k."
-
-    m = n + k
-    n_interior = n + 1 - k  # number of strictly interior knots
-
-    if n_interior == 0:
-        # Pure Bezier: no interior knots
-        interior = jnp.array([])
-    else:
-        interior = jnp.linspace(0.0, 1.0, n_interior + 2)[1:-1]  # exclude 0 and 1
-
-    T = jnp.concatenate(
-        [
-            jnp.zeros(k),
-            interior,
-            jnp.ones(k),
-        ]
-    )
-    assert T.shape[0] == m + 1
-    return T
-
-
-def uniform_span_index(n: int, k: int, t: Float[Array, "..."]) -> Int[Array, "..."]:
-    """
-    Compute the knot span index j for a uniform clamped knot vector.
-
-    For uniform knots the interior spans are evenly spaced, so j is just
-    a scaled floor. The clamped knot vector has k repeated knots at each
-    end, so valid span indices run from k-1 to n (inclusive).
-    """
-    n_spans = n - k + 2  # number of polynomial segments
-    # Map t in [0,1] to a raw span index in [0, n_spans-1]
-    raw = jnp.floor(t * n_spans).astype(jnp.int32)
-    # Clamp: left boundary -> k-1, right boundary -> n
-    j = jnp.clip(raw + (k - 1), k - 1, n)
-    return j
+    return jnp.array(get_knots_static(n, k))
 
 
 def get_relevant_points(index: Int[Array, ""], P: Float[Array, "np1 d"], k: int) -> Float[Array, "k d"]:
