@@ -29,7 +29,7 @@ def safe_norm(
 def resample(data, n_new: int, t=None, xp_indices: tuple[int, ...] | None = None) -> jnp.ndarray:
     # Calculate cumulative arc length
     xp_indices = list(range(data.shape[-1])) if xp_indices is None else list(xp_indices)
-    #xp_indices gives dims which participate in the distance calculation.
+    # xp_indices gives dims which participate in the distance calculation.
     xdata = data[..., xp_indices]
     distances = safe_norm(xdata[1:] - xdata[:-1], axis=-1, ord=2, min_norm=1e-4)
     cumulative_distances = jnp.cumsum(distances)
@@ -46,8 +46,8 @@ def resample(data, n_new: int, t=None, xp_indices: tuple[int, ...] | None = None
 # %%
 P = jnp.array([[0.0, 0.0], [1.0, 2.0], [2.0, 2.0], [3.0, 0.0], [4.0, -1.0]])
 
-# 64 output points, cubic B-spline (order 4 - 1 = degree 3)
-b = partial(bspline, n_output=64, order=4, use_static=True)
+# 64 output points, cubic B-spline (k 4 - 1 = degree 3)
+b = partial(bspline, n_points=64, k=4)
 curve_points = b(P)
 curve_points_resampled = resample(curve_points, n_new=64)
 
@@ -79,11 +79,13 @@ fig.show()
 # %%
 from bspx import bspline_derivative
 
-curve_points = bspline(P, n_output=64, order=4, use_static=True)
-velocity_points = bspline_derivative(P, n_output=64, order=4, use_static=True)
-acceleration_points = bspline_derivative(P, n_output=64, order=4, use_static=True, derivative_order=2)
+curve_points = bspline(P, n_points=64, k=4)
+velocity_points = bspline_derivative(P, n_points=64, k=4)
+acceleration_points = bspline_derivative(P, n_points=64, k=4, derivative_order=2)
 trace_curve = go.Scatter(x=curve_points[:, 0], y=curve_points[:, 1], mode="lines+markers", name="B-spline Curve")
-trace_velocity = go.Scatter(x=velocity_points[:, 0], y=velocity_points[:, 1], mode="lines+markers", name="Velocity (1st Derivative)")
+trace_velocity = go.Scatter(
+    x=velocity_points[:, 0], y=velocity_points[:, 1], mode="lines+markers", name="Velocity (1st Derivative)"
+)
 trace_acceleration = go.Scatter(
     x=acceleration_points[:, 0], y=acceleration_points[:, 1], mode="lines+markers", name="Acceleration (2nd Derivative)"
 )
@@ -97,12 +99,23 @@ data_resampled = resample(data, n_new=64, xp_indices=(0, 1))
 curve_points_resampled = data_resampled[:, :2]
 velocity_resampled = data_resampled[:, 2:4]
 acceleration_resampled = data_resampled[:, 4:6]
-trace_curve_resampled = go.Scatter(x=curve_points_resampled[:, 0], y=curve_points_resampled[:, 1], mode="lines+markers", name="Resampled B-spline Curve")
+trace_curve_resampled = go.Scatter(
+    x=curve_points_resampled[:, 0],
+    y=curve_points_resampled[:, 1],
+    mode="lines+markers",
+    name="Resampled B-spline Curve",
+)
 trace_velocity_resampled = go.Scatter(
-    x=velocity_resampled[:, 0], y=velocity_resampled[:, 1], mode="lines+markers", name="Resampled Velocity (1st Derivative)"
+    x=velocity_resampled[:, 0],
+    y=velocity_resampled[:, 1],
+    mode="lines+markers",
+    name="Resampled Velocity (1st Derivative)",
 )
 trace_acceleration_resampled = go.Scatter(
-    x=acceleration_resampled[:, 0], y=acceleration_resampled[:, 1], mode="lines+markers", name="Resampled Acceleration (2nd Derivative)"
+    x=acceleration_resampled[:, 0],
+    y=acceleration_resampled[:, 1],
+    mode="lines+markers",
+    name="Resampled Acceleration (2nd Derivative)",
 )
 fig = go.Figure(data=[trace_curve_resampled, trace_velocity_resampled, trace_acceleration_resampled])
 fig.update_layout(title="Resampled B-spline Curve and its Derivatives", xaxis_title="X", yaxis_title="Y")
