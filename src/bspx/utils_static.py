@@ -22,6 +22,21 @@ def get_knots_static(n: int, k: int) -> Float[np.ndarray, " {n+k+1}"]:
     return T
 
 
+def greville_abscissae(n_ctrl: int, order: int) -> Float[np.ndarray, " n_ctrl"]:
+    """Compute Greville abscissae for a clamped uniform B-spline.
+
+    The Greville abscissa of basis function i is the average of its k-1
+    consecutive interior knots: ξ_i = mean(T[i+1 : i+k]).
+
+    Placing control points at P_i = f(ξ_i) makes the B-spline exactly
+    reproduce the function f.  In particular, linearly-spaced Greville
+    values reproduce a straight line.
+    """
+    n = n_ctrl - 1
+    T = get_knots_static(n, order)
+    return np.array([np.mean(T[i + 1 : i + order]) for i in range(n_ctrl)])
+
+
 def get_indices_static(n: int, k: int, t: Float[np.ndarray, "..."]) -> Int[np.ndarray, "..."]:
     n_spans = n - k + 2
     raw = np.floor(t * n_spans).astype(np.int32)

@@ -36,17 +36,17 @@ def timeit(func, *args, **kwargs):
     return avg
 
 
-# Time the static version
-# b_static = BSpline(128, 4, use_static=True)
-b_static = jax.jit(partial(bspline, n_output=128, order=4, use_static=True))
-b_dynamic = jax.jit(partial(bspline, n_output=128, order=4, use_static=False))
+# n_output → compile-time precomputed (static) path
+b_static = jax.jit(partial(bspline, n_output=128, order=4))
+# ts → runtime (dynamic) path
+b_dynamic = jax.jit(partial(bspline, order=4, ts=jnp.linspace(0.0, 1.0, 128)))
 
 P = jnp.array([[0.0, 0.0], [1.0, 2.0], [2.0, 2.0], [3.0, 0.0], [4.0, -1.0]])
 
-print("Timing static version...")
+print("Timing static version (n_output)...")
 timeit(b_static, P, n_runs=1000)
 
-print("Timing dynamic version...")
+print("Timing dynamic version (ts)...")
 timeit(b_dynamic, P, n_runs=1000)
 
 # %%

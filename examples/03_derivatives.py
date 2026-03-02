@@ -20,7 +20,7 @@ display(
 P = jnp.array([[0.0, 0.0], [1.0, 2.0], [2.0, 2.0], [3.0, 0.0], [4.0, -1.0]])
 
 # 64 output points, cubic B-spline (order 4 - 1 = degree 3)
-b = partial(bspline, n_output=64, order=4, use_static=False)
+b = partial(bspline, n_output=64, order=4)
 curve_points = b(P)
 
 fig = go.Figure()
@@ -29,7 +29,7 @@ fig.add_trace(go.Scatter(x=P[:, 0], y=P[:, 1], mode="lines+markers", name=r"$P$"
 fig.update_layout(title="B-spline Curve and Control Points", xaxis_title="x", yaxis_title="y")
 fig.show()
 # %%
-derivatives = bspline_derivative(P, n_output=64, order=4, use_static=False, derivative_order=3, emit_intermediates=True)
+derivatives = bspline_derivative(P, n_output=64, order=4, derivative_order=3, emit_intermediates=True)
 fig = go.Figure()
 for i, d in enumerate(derivatives):
     name = r"$C" + "'" * (i + 1) + r"$"
@@ -42,7 +42,7 @@ fig.show()
 
 P_start = jnp.array([[0.0, 0.0], [1.0, 0.0], [2.0, 0.0], [3.0, 0.0], [4.0, 0.0]])
 P_target = P
-b = partial(bspline, n_output=64, order=4, use_static=False)
+b = partial(bspline, n_output=64, order=4)
 
 
 def loss_fn(P):
@@ -181,4 +181,3 @@ for i in range(len(P)):
     )
 fig.update_layout(title="Control Point Corrections", xaxis_title="x", yaxis_title="y", legend_title="Legend")
 fig.show()
-
