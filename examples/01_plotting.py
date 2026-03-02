@@ -9,7 +9,7 @@ from functools import partial
 P = jnp.array([[0.0, 0.0], [1.0, 2.0], [2.0, 2.0], [3.0, 0.0], [4.0, -1.0]])
 
 # 64 output points, cubic B-spline (order 4 - 1 = degree 3)
-b = partial(bspline, n_output=64, order=4, use_static=False)
+b = partial(bspline, n_output=64, order=4)
 
 curve_points = b(P)
 
@@ -21,7 +21,7 @@ fig.show()
 # %%
 # 3D example in plotly
 P_3d = jnp.array([[0.0, 0.0, 0.0], [1.0, 2.0, 1.0], [2.0, 2.0, 0.5], [3.0, 0.0, 1.5], [4.0, -1.0, 0.0]])
-b_3d = partial(bspline, n_output=128, order=4, use_static=False)
+b_3d = partial(bspline, n_output=128, order=4)
 curve_points_3d = b_3d(P_3d)
 fig_3d = go.Figure()
 fig_3d.add_trace(

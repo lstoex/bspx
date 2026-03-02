@@ -7,7 +7,7 @@
 #     from .utils_static import get_knots_static
 ###---------------Use this for no runtime type checking (faster) --------
 from .curves import bspline, bspline_derivative
-from .utils_static import get_knots_static
+from .utils_static import get_knots_static, greville_abscissae
 
-__all__ = ("bspline", "get_knots_static", "bspline_derivative")
+__all__ = ("bspline", "get_knots_static", "bspline_derivative", "greville_abscissae")
 __version__ = "0.0.0"

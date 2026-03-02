@@ -165,12 +165,10 @@ name = "bspx"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "equinox" },
     { name = "jax" },
     { name = "jax", extra = ["cuda13"], marker = "sys_platform != 'darwin'" },
     { name = "jaxtyping" },
     { name = "numpy" },
-    { name = "plotly" },
 ]
 
 [package.dev-dependencies]
@@ -179,19 +177,19 @@ dev = [
     { name = "ipykernel" },
     { name = "jupyter" },
     { name = "marimo" },
+    { name = "plotly" },
     { name = "pytest" },
     { name = "ruff" },
+    { name = "scipy" },
     { name = "ty" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "equinox", specifier = ">=0.13.2" },
     { name = "jax", marker = "sys_platform == 'darwin'" },
     { name = "jax", extras = ["cuda13"], marker = "sys_platform != 'darwin'" },
     { name = "jaxtyping", specifier = ">=0.3.5" },
     { name = "numpy", specifier = ">=2.4.1" },
-    { name = "plotly", specifier = ">=6.5.2" },
 ]
 
 [package.metadata.requires-dev]
@@ -200,8 +198,10 @@ dev = [
     { name = "ipykernel", specifier = ">=7.1.0" },
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "marimo", specifier = ">=0.19.6" },
+    { name = "plotly", specifier = ">=6.5.2" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "ruff", specifier = ">=0.14.14" },
+    { name = "scipy", specifier = ">=1.15.0" },
     { name = "ty", specifier = ">=0.0.12" },
 ]
 
@@ -372,21 +372,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ae/b6/03bb70946330e88ffec97aefd3ea75ba575cb2e762061e0e62a213befee8/docutils-0.22.4.tar.gz", hash = "sha256:4db53b1fde9abecbb74d91230d32ab626d94f6badfc575d6db9194a49df29968", size = 2291750, upload-time = "2025-12-18T19:00:26.443Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/02/10/5da547df7a391dcde17f59520a231527b8571e6f46fc8efb02ccb370ab12/docutils-0.22.4-py3-none-any.whl", hash = "sha256:d0013f540772d1420576855455d050a2180186c91c15779301ac2ccb3eeb68de", size = 633196, upload-time = "2025-12-18T19:00:18.077Z" },
-]
-
-[[package]]
-name = "equinox"
-version = "0.13.4"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "jax" },
-    { name = "jaxtyping" },
-    { name = "typing-extensions" },
-    { name = "wadler-lindig" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/2d/80/1704c3375a9c3cae4713a1be12b59dbd8ddff03808862264be622b333cd1/equinox-0.13.4.tar.gz", hash = "sha256:d4eed5d7f981a5ddcb7bc70e601707769fb4da20f777703cc6e01a6248af9758", size = 140981, upload-time = "2026-01-26T22:29:19.417Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/96/4c/eea4860010ba31d6793038073c66f2e1755c80d0adb704c4926d549e724a/equinox-0.13.4-py3-none-any.whl", hash = "sha256:8203b6b84c1641a58aad07c040c171fc5a38e2c3bc90c5feb2f221d398354378", size = 181231, upload-time = "2026-01-26T22:29:17.859Z" },
 ]
 
 [[package]]

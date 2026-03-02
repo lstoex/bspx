@@ -36,7 +36,8 @@ def get_blending_weight_for_stage(
     for a given span index j, knot vector T, and parameter t."""
     numerator = t - T[j - k + 1 + i]
     denominator = T[j + i - r + 1] - T[j - k + 1 + i]
-    alpha = jnp.where(denominator == 0.0, 0.0, numerator / denominator)
+    safe_denom = jnp.where(denominator == 0.0, 1.0, denominator)
+    alpha = jnp.where(denominator == 0.0, 0.0, numerator / safe_denom)
     return alpha
 
 
