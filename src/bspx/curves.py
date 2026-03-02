@@ -49,6 +49,42 @@ def bspline(
     return _evaluate(control_points, order, n_output, ts)
 
 
+@jax.jit(static_argnames=["order", "n_output", "n_fine"])
+def resample_arc_length(
+    control_points: Float[Array, "n_in d"],
+    n_output: int,
+    order: int = 4,
+    n_fine: int = 200,
+) -> Float[Array, "n_output d"]:
+    """Re-evaluate a B-spline at arc-length-uniform parameter values.
+
+    Densely samples the curve (``n_fine`` points), computes cumulative chord
+    lengths, maps uniform arc-length targets back to parameter values via
+    linear interpolation, then re-evaluates the B-spline at those parameters.
+
+    The output lies exactly on the original B-spline curve, preserving its
+    continuity class (e.g. C2 for cubic).
+
+    Args:
+        control_points: Control points of shape (n_in, d).
+        n_output: Number of arc-length-uniform output points.
+        order: B-spline order (default 4 = cubic).
+        n_fine: Number of dense samples for arc-length estimation (default 200).
+
+    Returns:
+        Points on the B-spline with approximately uniform arc-length spacing.
+    """
+    q_fine = _evaluate(control_points, order, n_fine, None)
+    steps = q_fine[1:] - q_fine[:-1]
+    lengths = jnp.linalg.norm(steps, axis=-1)
+    cum_len = jnp.concatenate([jnp.array([0.0]), jnp.cumsum(lengths)])
+    total_len = cum_len[-1]
+    target_arc = jnp.linspace(0.0, total_len, n_output)
+    t_fine = jnp.linspace(0.0, 1.0, n_fine)
+    t_uniform = jnp.interp(target_arc, cum_len, t_fine)
+    return _evaluate(control_points, order, None, t_uniform)
+
+
 @jax.jit(static_argnames=["order", "n_output", "derivative_order", "emit_intermediates"])
 def bspline_derivative(
     control_points: Float[Array, "n_in d"],
