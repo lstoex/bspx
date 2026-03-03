@@ -3,6 +3,8 @@ import numpy as np
 import pytest
 from scipy.interpolate import BSpline as SciPyBSpline
 
+import bspx
+
 
 @pytest.mark.parametrize(
     "n, k, n_points",
@@ -185,3 +187,35 @@ def test_bspline_derivative_nonuniform_against_scipy(n, k, n_points, derivative_
 
         # Compare results
         np.testing.assert_allclose(result, expected, rtol=1e-5, atol=1e-5)
+
+
+@pytest.mark.parametrize("n_ctrl, k", [(6, 4), (8, 4), (8, 5)])
+def test_greville_abscissae_needed(n_ctrl, k):
+    """Uniformly-spaced control points on a line do NOT reproduce that line
+    for order k >= 3, but Greville-spaced control points do."""
+
+    def line(t):
+        return np.column_stack([t, 2.0 * t + 1.0])
+
+    n_points = 50
+
+    # --- uniform spacing: NOT a straight line ---
+    t_uniform = np.linspace(0.0, 1.0, n_ctrl)
+    P_uniform = jnp.array(line(t_uniform))
+    curve_uniform = np.array(bspx.bspline(P_uniform, n_points=n_points, k=k))
+
+    # the expected straight line evaluated at the same output parameters
+    t_out = np.linspace(0.0, 1.0, n_points)
+    expected = line(t_out)
+
+    max_err_uniform = np.max(np.abs(curve_uniform - expected))
+    assert max_err_uniform > 1e-3, (
+        f"Uniform spacing should deviate from the line, but max error was only {max_err_uniform:.2e}"
+    )
+
+    # --- Greville spacing: IS a straight line ---
+    t_greville = bspx.greville_abscissae(n_ctrl, k)
+    P_greville = jnp.array(line(t_greville))
+    curve_greville = np.array(bspx.bspline(P_greville, n_points=n_points, k=k))
+
+    np.testing.assert_allclose(curve_greville, expected, atol=1e-5)
