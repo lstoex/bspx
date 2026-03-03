@@ -40,16 +40,20 @@ def bspline(
     elif T is not None and t is not None:
         j = get_indices_nonuniform(n, T, t)
         return propagate(control_points, k, j, None, T, t)
+    elif T is None and t is not None:
+        T_ = clamped_uniform_knot_vector(n, k, True)
+        j = get_indices_nonuniform(n, T_, t)
+        return propagate(control_points, k, j, None, T_, t)
     else:
-        raise ValueError("Either both T and t must be provided, or neither.")
+        raise ValueError("Both T and t or just t must be provided.")
 
 
 @jax.jit(static_argnames=["k", "n_points", "n_fine"])
-def resample_arc_length(
+def bspline_uniform(
     control_points: Float[Array, "np1 d"],
     n_points: int,
     k: int,
-    n_fine: int = 200,
+    n_fine: int | None = None,
 ) -> Float[Array, "n_points d"]:
     """Re-evaluate a B-spline at arc-length-uniform parameter values.
 
@@ -64,22 +68,21 @@ def resample_arc_length(
         control_points: Control points of shape (np1, d).
         n_points: Number of arc-length-uniform output points.
         k: B-spline order (4 = cubic).
-        n_fine: Number of dense samples for arc-length estimation (default 200).
+        n_fine: Number of dense samples for arc-length estimation (defaults to n_points if not provided).
 
     Returns:
         Points on the B-spline with approximately uniform arc-length spacing.
     """
-    n = control_points.shape[0] - 1
-    q_fine = bspline(control_points, n_fine, k)
-    steps = q_fine[1:] - q_fine[:-1]
-    lengths = jnp.linalg.norm(steps, axis=-1)
-    cum_len = jnp.concatenate([jnp.array([0.0]), jnp.cumsum(lengths)])
+    n_fine = n_fine or n_points
+    c_fine = bspline(control_points, n_fine, k)
+    segments = jnp.linalg.norm(c_fine[1:] - c_fine[:-1], axis=-1)
+    cum_len = jnp.concatenate([jnp.array([0.0]), jnp.cumsum(segments)])
     total_len = cum_len[-1]
-    target_arc = jnp.linspace(0.0, total_len, n_points)
-    t_fine = jnp.linspace(0.0, 1.0, n_fine)
-    t_uniform = jnp.interp(target_arc, cum_len, t_fine)
-    T = jnp.array(clamped_uniform_knot_vector(n, k))
-    return bspline(control_points, n_points, k, T=T, t=t_uniform)
+    t_old = jnp.linspace(0.0, 1.0, n_fine)
+    normalized_length_distribution = cum_len / total_len
+    t_new = jnp.interp(jnp.linspace(0.0, 1.0, n_points), normalized_length_distribution, t_old)
+    t_new = jax.lax.stop_gradient(t_new)  # Prevent gradients from flowing through the reparameterization
+    return bspline(control_points, n_points=n_points, k=k, t=t_new)
 
 
 @jax.jit(static_argnames=["k", "n_points", "derivative_order", "emit_intermediates"])

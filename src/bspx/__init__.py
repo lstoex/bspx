@@ -7,14 +7,13 @@ from jaxtyping import install_import_hook
 #     from .curves import bspline, bspline_derivative
 #     from .utils import clamped_uniform_knot_vector
 ###---------------Use this for no runtime type checking (faster) --------
-from .curves import bspline, bspline_derivative, resample_arc_length
+from .curves import bspline, bspline_derivative, bspline_uniform
 from .utils import clamped_uniform_knot_vector, greville_abscissae
 
 __all__ = (
     "bspline",
     "bspline_derivative",
     "clamped_uniform_knot_vector",
-    "greville_abscissae",
-    "resample_arc_length",
+    "bspline_uniform",
 )
 __version__ = "0.0.0"
