@@ -31,6 +31,7 @@ dev = [
     "marimo>=0.19.6",
     "beartype>=0.22.9",
     "livereload>=2.7.1",
+    "matplotlib>=3.10.8",
 ]
 
 [tool.ruff]
