@@ -3,65 +3,60 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jaxtyping import Array, Float
+from jaxtyping import Array, Float, Int
 
-from .utils import get_alphas, get_indices, get_relevant_points, make_uniform_knot_vector
-from .utils_static import precompute_aligned_alphas
-
-
-def _blend(d, k, alphas):
-    """Perform the de Boor blending stages. Shared by static and dynamic variants."""
-    for r_ in range(1, k):
-        for i in range(k - 1, r_ - 1, -1):  # reverse order to avoid overwriting needed values
-            alpha = alphas[r_ - 1][i - r_]
-            d = d.at[i].set((1.0 - alpha) * d[i - 1] + alpha * d[i])
-    return d[k - 1]
+from .utils import compute_alpha, flat_triangular_index
 
 
-def de_boor_static(P: Float[Array, "np1 d"], k: int, ts: Float[np.ndarray, " n_points"]) -> Float[Array, " n_points d"]:
-    """
-    Evaluate a B-spline curve at n_points uniformly spaced parameter values in [0, 1].
-    Computes as much as possible at compile time for maximum performance when t values are known at compile time.
+def init_d(P: Float[Array | np.ndarray, "np1 d"], j: Int[np.ndarray | Array, " n_points"], k: int):
+    """Initialize the d array for de Boor's algorithm.
+    For each evaluation point, we need to select k control points based on the index j.
     Args:
-    P: control points, shape (n+1, d)
-    k: order of the B-spline
-    ts: parameter values to evaluate at, shape (n_points,)
+    P: Control points, shape (n+1, d)
+    j: Knot span indices for each evaluation point, shape (n_points,)
+    k: Order of the B-spline
     """
-    with jax.ensure_compile_time_eval():
-        n = P.shape[0] - 1
-        alphas_padded, js = precompute_aligned_alphas(n, k, ts)
+    if isinstance(j, np.ndarray):
+        i = np.arange(k)
+        return P[j[:, None] - k + 1 + i]  # shape (n_points, k)
+    elif isinstance(j, jnp.ndarray):
+        start_P = j - k + 1  # shape (n_points,)
 
-    def blend(j, a, P):
-        d = get_relevant_points(j, P, k)
-        return _blend(d, k, a)
+        def index(start):
+            return jax.lax.dynamic_slice_in_dim(P, start, k, axis=0)  # shape (k, d)
 
-    return jax.vmap(blend, in_axes=(0, 0, None))(js, alphas_padded, P)
-
-
-def de_boor(P: Float[Array, "np1 d"], k: int, ts: Float[Array, " n_points"]) -> Float[Array, " n_points d"]:
-    """
-    Evaluate a B-spline curve at the given parameter values ts.
-    This version computes the blending weights at runtime, so it can handle dynamic t values.
-    Args:
-    P: control points, shape (n+1, d)
-    k: order of the B-spline
-    ts: parameter values to evaluate at, shape (n_points,)
-    """
-    n = P.shape[0] - 1
-    T = make_uniform_knot_vector(n, k)
-
-    def blend(t, P):
-        j = get_indices(n, k, t)
-        a = get_alphas(k, j, T, t)
-        d = get_relevant_points(j, P, k)
-        return _blend(d, k, a)
-
-    return jax.vmap(blend, in_axes=(0, None))(ts, P)
+        return jax.vmap(index)(start_P)  # shape (n_points, k
 
 
-def diff_spline(
-    P: Float[Array, "np1 d"], k: int, T: Float[Array, " np1+{k}"]
-) -> tuple[Float[Array, "n d"], int, Float[Array, " n+{k}-1"]]:
+def propagate(
+    P: Float[Array | np.ndarray, "np1 d"],
+    k: int,
+    j: Int[np.ndarray | Array, " n_points"],
+    alphas_precomputed_flat: Float[np.ndarray, "n_points n_alphas"] | None,
+    T: Float[Array | np.ndarray, " mp1"] | None = None,
+    t: Float[Array | np.ndarray, " n_points"] | None = None,
+):
+    d = init_d(P, j, k)  # shape (n_points, k)
+    for r in range(1, k):
+        for i in range(k - 1, r - 1, -1):
+            a = r - 1
+            b = i - 1
+            if T is not None and t is not None and alphas_precomputed_flat is None:
+                alpha = compute_alpha(k, r, i, j, T, t)
+            elif alphas_precomputed_flat is not None and T is None and t is None:
+                alpha = alphas_precomputed_flat[:, flat_triangular_index(a, b, k - 1)]
+            else:
+                raise ValueError("Either T and t or alphas_flat must be provided.")
+            if isinstance(d, np.ndarray):
+                d[:, i] = (1.0 - alpha[..., None]) * d[:, i - 1] + alpha[..., None] * d[:, i]
+            else:
+                d = d.at[:, i].set((1.0 - alpha[..., None]) * d[:, i - 1] + alpha[..., None] * d[:, i])
+    return d[:, k - 1]
+
+
+def differentiate(
+    P: Float[Array | np.ndarray, "np1 d"], k: int, T: Float[Array | np.ndarray, " np1+{k}"]
+) -> tuple[Float[Array | np.ndarray, "n d"], int, Float[Array | np.ndarray, " n+{k}-1"]]:
     """Compute the control points and knot vector for the derivative of a B-spline curve.
     Args:
         P: control points of the original B-spline curve, shape (n+1, d)
@@ -74,9 +69,8 @@ def diff_spline(
     """
     assert k > 1, "Cannot compute derivative of a B-spline curve of order 1 or less."
     n = P.shape[0] - 1
-    Q = jnp.diff(P, axis=0) * (k - 1)
-    denom = T[k : n + k] - T[1 : n + 1]
-    zero_mask = jnp.abs(denom) < 1e-10
-    safe_denom = jnp.where(zero_mask, 1.0, denom)
-    Q = jnp.where(zero_mask[:, None], 0.0, Q / safe_denom[:, None])
+    lib = np if isinstance(P, np.ndarray) else jnp
+    Q = lib.diff(P, axis=0) * (k - 1)
+    denom = (T[k : n + k] - T[1 : n + 1])[:, None]  # shape (n, 1) for broadcasting
+    Q = lib.where(lib.isclose(denom, 0.0), lib.zeros_like(Q), Q / denom)
     return Q, k - 1, T[1:-1]

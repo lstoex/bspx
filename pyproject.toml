@@ -30,6 +30,7 @@ dev = [
     "ruff>=0.14.14",
     "marimo>=0.19.6",
     "beartype>=0.22.9",
+    "livereload>=2.7.1",
 ]
 
 [tool.ruff]
