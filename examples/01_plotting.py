@@ -9,7 +9,7 @@ from functools import partial
 P = jnp.array([[0.0, 0.0], [1.0, 2.0], [2.0, 2.0], [3.0, 0.0], [4.0, -1.0]])
 
 # 64 output points, cubic B-spline (k 4 - 1 = degree 3)
-b = partial(bspline, n_points=64, k=4, use_static=False)
+b = partial(bspline, n_points=64, k=4)
 
 curve_points = b(P)
 
