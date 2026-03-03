@@ -18,7 +18,7 @@ from scipy.interpolate import BSpline as SciPyBSpline
 def test_bspline_uniform_against_scipy(n, k, n_points):
     import bspx
 
-    T = bspx.utils.clamped_uniform_knot_vector(n, k)
+    T = bspx.clamped_uniform_knot_vector(n, k)
     t = np.linspace(0, 1, n_points)
 
     if k > n + 1:
@@ -99,7 +99,7 @@ def test_bspline_nonuniform_against_scipy(n, k, n_points):
 def test_bspline_derivative_uniform_against_scipy(n, k, n_points, derivative_order):
     import bspx
 
-    T = bspx.utils.clamped_uniform_knot_vector(n, k)
+    T = bspx.clamped_uniform_knot_vector(n, k)
     t = np.linspace(0, 1, n_points)
 
     if derivative_order >= k:
