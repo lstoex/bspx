@@ -32,37 +32,31 @@ def bspline(
     if T is None and t is None:
         with jax.ensure_compile_time_eval():
             t_ = np.linspace(0.0, 1.0, n_points)
-            T_ = clamped_uniform_knot_vector(n, k, False)
+            T_ = clamped_uniform_knot_vector(n, k, use_jax=False)
             j = get_indices_uniform(n, k, t_)
             assert isinstance(j, np.ndarray) and isinstance(T_, np.ndarray) and isinstance(t_, np.ndarray)
             alphas_flat = build_alpha_lut(k, j, T_, t_)
-        return propagate(control_points, k, j, alphas_flat)
+        return propagate(control_points, k, j, alphas_flat) #type: ignore
     elif T is not None and t is not None:
         j = get_indices_nonuniform(n, T, t)
-        return propagate(control_points, k, j, None, T, t)
+        return propagate(control_points, k, j, None, T, t) #type: ignore
     elif T is None and t is not None:
-        T_ = clamped_uniform_knot_vector(n, k, True)
+        T_ = clamped_uniform_knot_vector(n, k, use_jax=True)
         j = get_indices_nonuniform(n, T_, t)
-        return propagate(control_points, k, j, None, T_, t)
+        return propagate(control_points, k, j, None, T_, t) #type: ignore
     else:
         raise ValueError("Both T and t or just t must be provided.")
 
 
 @jax.jit(static_argnames=["k", "n_points", "n_fine"])
-def bspline_uniform(
+def bspline_arclength_adjusted(
     control_points: Float[Array, "np1 d"],
     n_points: int,
     k: int,
     n_fine: int | None = None,
 ) -> Float[Array, "n_points d"]:
-    """Re-evaluate a B-spline at arc-length-uniform parameter values.
-
-    Densely samples the curve (``n_fine`` points), computes cumulative chord
-    lengths, maps uniform arc-length targets back to parameter values via
-    linear interpolation, then re-evaluates the B-spline at those parameters.
-
-    The output lies exactly on the original B-spline curve, preserving its
-    continuity class (e.g. C2 for cubic).
+    """
+    Compute a B-spline curve at approximately uniform arclength distribution. Evaluates B-spline function twice.
 
     Args:
         control_points: Control points of shape (np1, d).
@@ -74,13 +68,12 @@ def bspline_uniform(
         Points on the B-spline with approximately uniform arc-length spacing.
     """
     n_fine = n_fine or n_points
-    c_fine = bspline(control_points, n_fine, k)
+    c_fine = bspline(control_points, n_fine, k) #get dense samples for arc-length estimation
     segments = jnp.linalg.norm(c_fine[1:] - c_fine[:-1], axis=-1)
     cum_len = jnp.concatenate([jnp.array([0.0]), jnp.cumsum(segments)])
-    total_len = cum_len[-1]
-    t_old = jnp.linspace(0.0, 1.0, n_fine)
-    normalized_length_distribution = cum_len / total_len
-    t_new = jnp.interp(jnp.linspace(0.0, 1.0, n_points), normalized_length_distribution, t_old)
+    t_old = jnp.linspace(0.0, 1.0, n_fine) #arc-lengths correspond to these parameter values
+    normalized_length_distribution = cum_len / cum_len[-1] #normalize to [0, 1]
+    t_new = jnp.interp(jnp.linspace(0.0, 1.0, n_points), normalized_length_distribution, t_old) #map (t,ac) -> t_new
     t_new = jax.lax.stop_gradient(t_new)  # Prevent gradients from flowing through the reparameterization
     return bspline(control_points, n_points=n_points, k=k, t=t_new)
 
@@ -108,8 +101,8 @@ def bspline_derivative(
     """
 
     n = control_points.shape[0] - 1
-    T_ = clamped_uniform_knot_vector(n, k) if T is None else T
-    t_ = np.linspace(0.0, 1.0, n_points) if t is None else t
+    T_ = T or clamped_uniform_knot_vector(n, k)
+    t_ = t or np.linspace(0.0, 1.0, n_points)
     k_ = k
     Q = control_points
 
