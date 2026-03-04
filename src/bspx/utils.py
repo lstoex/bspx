@@ -41,7 +41,10 @@ def get_indices_nonuniform(
     lib = jnp if isinstance(t, jnp.ndarray) else np
     m = T.shape[0] - 1
     k = m - n  # order of the B-spline
-    j = lib.searchsorted(T, t, side="right") - 1
+    if lib == jnp:
+        j = jnp.searchsorted(T, t, side="right", method="scan_unrolled") - 1
+    else:
+        j = np.searchsorted(T, t, side="right") - 1
     # Clamp to valid range [k-1, n]
     j = lib.clip(j, k - 1, n)
     return j
