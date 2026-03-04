@@ -54,7 +54,7 @@ def bspline_arclength_adjusted(
     n_points: int,
     k: int,
     n_fine: int | None = None,
-) -> Float[Array, "n_points d"]:
+) -> tuple[Float[Array, "n_points d"], Float[Array, " n_points"]]:
     """
     Compute a B-spline curve at approximately uniform arclength distribution. Evaluates B-spline function twice.
 
@@ -65,7 +65,7 @@ def bspline_arclength_adjusted(
         n_fine: Number of dense samples for arc-length estimation (defaults to n_points if not provided).
 
     Returns:
-        Points on the B-spline with approximately uniform arc-length spacing.
+        Points on the B-spline with approximately uniform arc-length spacing, and the corresponding t values used for evaluation.
     """
     n_fine = n_fine or n_points
     c_fine = bspline(control_points, n_points=n_fine, k=k)  # get dense samples for arc-length estimation
@@ -75,7 +75,7 @@ def bspline_arclength_adjusted(
     normalized_length_distribution = cum_len / cum_len[-1]  # normalize to [0, 1]
     t_new = jnp.interp(jnp.linspace(0.0, 1.0, n_points), normalized_length_distribution, t_old)  # map (t,ac) -> t_new
     t_new = jax.lax.stop_gradient(t_new)  # Prevent gradients from flowing through the reparameterization
-    return bspline(control_points, n_points=n_points, k=k, t=t_new)
+    return bspline(control_points, n_points=n_points, k=k, t=t_new), t_new
 
 
 @jax.jit(static_argnames=["k", "n_points", "derivative_order", "emit_intermediates"])
