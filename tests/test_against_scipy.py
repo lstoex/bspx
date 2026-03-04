@@ -206,13 +206,13 @@ def test_constant_arclength(n, k, n_points):
     if k > n + 1:
         with pytest.raises(AssertionError):
             control_points = np.random.rand(n + 1, 2)  # 2D control points
-            bspx.bspline_arclength_adjusted(control_points, n_points=n_points, k=k, n_fine=n_fine)
+            _ = bspx.bspline_arclength_adjusted(control_points, n_points=n_points, k=k, n_fine=n_fine)
     else:
         # Create random control points
         control_points = np.random.rand(n + 1, 2)  # 2D control points
 
         # Create our B-spline and evaluate
-        result = bspx.bspline_arclength_adjusted(control_points, n_points=n_points, k=k, n_fine=n_fine)
+        result = bspx.bspline_arclength_adjusted(control_points, n_points=n_points, k=k, n_fine=n_fine)[0]
 
         # compute arc lengths
         segments_after = jnp.linalg.norm(jnp.diff(result, axis=0), axis=-1)

@@ -32,6 +32,7 @@ dev = [
     "beartype>=0.22.9",
     "livereload>=2.7.1",
     "matplotlib>=3.10.8",
+    "prettytable>=3.17.0",
 ]
 
 [tool.ruff]

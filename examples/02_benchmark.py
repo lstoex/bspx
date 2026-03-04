@@ -5,8 +5,9 @@ import jax  # noqa: F401
 import jax.numpy as jnp
 import numpy as np  # noqa: F401
 import plotly.graph_objects as go  # noqa: F401
+import prettytable as pt
 
-from bspx import bspline
+from bspx import bspline, bspline_arclength_adjusted
 
 
 # %%
@@ -15,8 +16,10 @@ def timeit(func, *args, **kwargs):
 
     n_runs = kwargs.pop("n_runs", 1000)
     start = time.time()
+    output_form = func(*args, **kwargs)
+    out_is_list = isinstance(output_form, (list, tuple))
     for _ in range(n_runs):
-        func(*args, **kwargs).block_until_ready()  # for JAX functions, ensure we wait for completion
+        func(*args, **kwargs).block_until_ready() if not out_is_list else func(*args, **kwargs)[0].block_until_ready()
     end = time.time()
     avg = (end - start) / n_runs
     # auto precision
@@ -31,30 +34,57 @@ def timeit(func, *args, **kwargs):
         avg *= 1e3
     else:
         precision = "s"
-    name = func.__name__ if hasattr(func, "__name__") else str(func)
-    print(f"{name} took {avg:.2f} {precision} on average over {n_runs} runs")
-    return avg
+    # name = func.__name__ if hasattr(func, "__name__") else str(func)
+    return avg, precision
+
+
+def manually_resampled_bspline(P, n_points=128, k=4):
+    curve = bspline(P, n_points=n_points, k=k)
+    # compute arclengths
+    diffs = jnp.diff(curve, axis=0)
+    segment_lengths = jnp.linalg.norm(diffs, axis=1)
+    cumulative_lengths = jnp.cumsum(segment_lengths)
+    cumulative_lengths = jnp.insert(cumulative_lengths, 0, 0.0)  # add starting point
+    normalized_lengths = cumulative_lengths / cumulative_lengths[-1]
+    # resample at uniform arclength intervals
+    target_lengths = jnp.linspace(0, 1, n_points)
+    return jax.vmap(jnp.interp, in_axes=(None, None, 1))(target_lengths, normalized_lengths, curve)
 
 
 from bspx.utils import clamped_uniform_knot_vector
 
-P = jnp.array([[0.0, 0.0], [1.0, 2.0], [2.0, 2.0], [3.0, 0.0], [4.0, -1.0]])
+P = np.random.rand(64, 14)  # 64 control points in 14D
 T = clamped_uniform_knot_vector(len(P) - 1, k=4)
 t = jnp.linspace(0, 1, 128)
 b_static = jax.jit(partial(bspline, n_points=128, k=4))
 b_dynamic = jax.jit(partial(bspline, n_points=128, k=4))
-
+b_arclength_adjusted = jax.jit(partial(bspline_arclength_adjusted, n_points=128, k=4))
+b_manual = jax.jit(partial(manually_resampled_bspline, n_points=128, k=4))
 
 print("Timing static version...")
-timeit(b_static, P, n_runs=1000)
+avg_static = timeit(b_static, P, n_runs=1000)
 
 print("Timing dynamic version...")
-timeit(b_dynamic, P, T=T, t=t, n_runs=1000)
+avg_dyn = timeit(b_dynamic, P, T=T, t=t, n_runs=1000)
+
+print("Timing arclength adjusted version...")
+avg_ac = timeit(b_arclength_adjusted, P, n_runs=1000)
+
+print("Timing manually resampled version...")
+avg_manual = timeit(b_manual, P, n_runs=1000)
 
 # %%
 # compare number of flops
 n_flops_static = b_static.lower(P).compile().cost_analysis()["flops"]
 n_flops_dynamic = b_dynamic.lower(P, T=T, t=t).compile().cost_analysis()["flops"]
-print(f"Static version flops: {n_flops_static}")
-print(f"Dynamic version flops: {n_flops_dynamic}")
-print(f"Static version is {n_flops_dynamic / n_flops_static:.2f} times more efficient in terms of flops")
+n_flops_arclength_adjusted = b_arclength_adjusted.lower(P).compile().cost_analysis()["flops"]
+n_flops_manual = b_manual.lower(P).compile().cost_analysis()["flops"]
+
+table = pt.PrettyTable()
+table.field_names = ["Version", "Avg Time", "Flops"]
+table.add_row(["Static", f"{avg_static[0]:.2f} {avg_static[1]}", f"{n_flops_static}"])
+table.add_row(["Dynamic", f"{avg_dyn[0]:.2f} {avg_dyn[1]}", f"{n_flops_dynamic}"])
+table.add_row(["Arclength Adjusted", f"{avg_ac[0]:.2f} {avg_ac[1]}", f"{n_flops_arclength_adjusted}"])
+table.add_row(["Manual Resampled", f"{avg_manual[0]:.2f} {avg_manual[1]}", f"{n_flops_manual}"])
+print(table)
+print(f"Number of control points: {len(P)} with dimension {P.shape[1]}")
