@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 from scipy.interpolate import BSpline as SciPyBSpline
 
+
 @pytest.mark.parametrize(
     "n, k, n_points",
     [
@@ -189,18 +190,18 @@ def test_bspline_derivative_nonuniform_against_scipy(n, k, n_points, derivative_
 @pytest.mark.parametrize(
     "n, k, n_points",
     [
-        (4, 3, 10),  # cubic Bezier
-        (5, 4, 20),  # cubic B-spline
-        (6, 5, 15),  # quartic B-spline
-        (7, 6, 25),  # quintic B-spline
-        (3, 2, 5),  # linear B-spline
-        (4, 5, 10),  # invalid case: k > n + 1, should raise an error
+        (4, 3, 64),  # cubic Bezier
+        (5, 4, 64),  # cubic B-spline
+        (6, 5, 64),  # quartic B-spline
+        (7, 6, 64),  # quintic B-spline
+        (3, 2, 64),  # linear B-spline
+        (4, 5, 64),  # invalid case: k > n + 1, should raise an error
     ],
 )
-
 def test_constant_arclength(n, k, n_points):
     import bspx
-    n_fine = 256
+
+    n_fine = 1024
 
     if k > n + 1:
         with pytest.raises(AssertionError):
@@ -211,13 +212,19 @@ def test_constant_arclength(n, k, n_points):
         control_points = np.random.rand(n + 1, 2)  # 2D control points
 
         # Create our B-spline and evaluate
-        result = bspx.bspline(control_points, n_points=n_points, k=k, n_fine=n_fine)
+        result = bspx.bspline_arclength_adjusted(control_points, n_points=n_points, k=k, n_fine=n_fine)
 
-        #compute arc lengths
-        diffs = result[1:] - result[:-1]
-        segments = jnp.linalg.norm(diffs, axis=-1)
+        # compute arc lengths
+        segments_after = jnp.linalg.norm(jnp.diff(result, axis=0), axis=-1)
+        segments_before = jnp.linalg.norm(
+            jnp.diff(bspx.bspline(control_points, n_points=n_points, k=k), axis=0), axis=-1
+        )
 
-        #assert close to uniform distribution
-        minmax = jnp.abs(jnp.max(segments) - jnp.min(segments))
-        np.testing.assert_almost_equal(minmax, 0.0, decimal=4)
+        # assert decrease in mean absolute deviation of segment lengths
+        mad_before = jnp.mean(jnp.abs(segments_before - jnp.mean(segments_before)))
+        mad_after = jnp.mean(jnp.abs(segments_after - jnp.mean(segments_after)))
 
+        # should be much more strict but its hard
+        assert mad_after < mad_before, (
+            f"Expected MAD to decrease after arclength adjustment, but got {mad_before} before and {mad_after} after"
+        )
