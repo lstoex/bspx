@@ -33,6 +33,8 @@ dev = [
     "livereload>=2.7.1",
     "matplotlib>=3.10.8",
     "prettytable>=3.17.0",
+    "pandas>=3.0.1",
+    "seaborn>=0.13.2",
 ]
 
 [tool.ruff]
