@@ -4,10 +4,12 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float, Int
 
+from ._typing import ControlPoints, KnotVector, Order, Time, SpanIndices
+
 
 def get_indices_uniform(
-    n: int, k: int, t: Float[Array | np.ndarray, " n_points"]
-) -> Int[Array | np.ndarray, " n_points"]:
+    n: int, k: Order, t: Time
+) -> SpanIndices:
     """Compute the knot span index j for a uniform clamped knot vector.
     For uniform knots the interior spans are evenly spaced, so j is just a scaled floor.
     The clamped knot vector has k repeated knots at each end, so valid span indices run from k-1 to n (inclusive).
@@ -26,8 +28,8 @@ def get_indices_uniform(
 
 
 def get_indices_nonuniform(
-    n: int, T: Float[Array | np.ndarray, " mp1"], t: Float[Array | np.ndarray, " n_points"]
-) -> Int[Array | np.ndarray, " n_points"]:
+    n: int, T: KnotVector, t: Time
+) -> SpanIndices:
     """Compute the knot span index j for a non-uniform (but strictly increasing!) knot vector T and parameter t.
     Args:
         n: number of control points - 1
@@ -50,7 +52,7 @@ def get_indices_nonuniform(
     return j
 
 
-def clamped_uniform_knot_vector(n: int, k: int, use_jax=False) -> Float[np.ndarray | Array, " {n+k+1}"]:
+def clamped_uniform_knot_vector(n: int, k: Order, use_jax=False) -> KnotVector:
     """Generate a clamped uniform knot vector for n+1 control points and order k.
     Args:
         n: number of control points - 1
@@ -78,12 +80,12 @@ def clamped_uniform_knot_vector(n: int, k: int, use_jax=False) -> Float[np.ndarr
 
 
 def compute_alpha(
-    k: int,
+    k: Order,
     r: int,
     i: int,
-    j: Int[np.ndarray | Array, " n_points"],
-    T: Float[np.ndarray | Array, " mp1"],
-    t: Float[np.ndarray | Array, " n_points"],
+    j: SpanIndices,
+    T: KnotVector,
+    t: Time,
 ) -> Float[np.ndarray | Array, "..."]:
     """Compute the alpha value for the r-th iteration and i-th control point in de Boor's algorithm.
     Args:
@@ -107,7 +109,7 @@ def compute_alpha(
 
 
 def build_alpha_lut(
-    k: int, j: Int[np.ndarray, " n_points"], T: Float[np.ndarray, " mp1"], t: Float[np.ndarray, " n_points"]
+    k: Order, j: SpanIndices, T: KnotVector, t: Time
 ) -> Float[np.ndarray, "n_points {(k-1)*k//2}"]:
     """Build a lookup table for the alphas used in de Boor's algorithm for uniform B-splines. Since the LUT is triangular, we save it as a row first flat array with size (k+1)*k//2.
     Args:
@@ -126,7 +128,7 @@ def build_alpha_lut(
     return np.stack(alphas, axis=-1)  # shape (n_points, n_alphas_per_point)
 
 
-def greville_abscissae(n_ctrl: int, order: int) -> Float[np.ndarray, " n_ctrl"]:
+def greville_abscissae(n_ctrl: int, order: Order) -> Float[np.ndarray, " n_ctrl"]:
     """Compute Greville abscissae for a clamped uniform B-spline.
 
     The Greville abscissa of basis function i is the average of its k-1

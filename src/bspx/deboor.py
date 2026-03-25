@@ -5,10 +5,11 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float, Int
 
+from ._typing import AlphaLUT, ControlPoints, CurvePoints, KnotVector, Order, Time, SpanIndices
 from .utils import compute_alpha, flat_triangular_index
 
 
-def init_d(P: Float[Array | np.ndarray, "np1 d"], j: Int[np.ndarray | Array, " n_points"], k: int):
+def init_d(P: ControlPoints, j: SpanIndices, k: Order):
     """Initialize the d array for de Boor's algorithm.
     For each evaluation point, we need to select k control points based on the index j.
     Args:
@@ -29,12 +30,12 @@ def init_d(P: Float[Array | np.ndarray, "np1 d"], j: Int[np.ndarray | Array, " n
 
 
 def propagate(
-    P: Float[Array | np.ndarray, "np1 d"],
-    k: int,
-    j: Int[np.ndarray | Array, " n_points"],
-    alphas_precomputed_flat: Float[np.ndarray, "n_points n_alphas"] | None,
-    T: Float[Array | np.ndarray, " mp1"] | None = None,
-    t: Float[Array | np.ndarray, " n_points"] | None = None,
+    P: ControlPoints,
+    k: Order,
+    j: SpanIndices,
+    alphas_precomputed_flat: AlphaLUT | None,
+    T: KnotVector | None = None,
+    t: Time | None = None,
 ):
     d = init_d(P, j, k)  # shape (n_points, k)
     for r in range(1, k):
@@ -55,8 +56,8 @@ def propagate(
 
 
 def differentiate(
-    P: Float[Array | np.ndarray, "np1 d"], k: int, T: Float[Array | np.ndarray, " np1+{k}"]
-) -> tuple[Float[Array | np.ndarray, "n d"], int, Float[Array | np.ndarray, " n+{k}-1"]]:
+    P: ControlPoints, k: Order, T: KnotVector
+) -> tuple[ControlPoints, Order, KnotVector]:
     """Compute the control points and knot vector for the derivative of a B-spline curve.
     Args:
         P: control points of the original B-spline curve, shape (n+1, d)

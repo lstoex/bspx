@@ -5,18 +5,19 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float
 
+from ._typing import ControlPoints, CurvePoints, KnotVector, Order, Time
 from .deboor import differentiate, propagate
 from .utils import build_alpha_lut, clamped_uniform_knot_vector, get_indices_nonuniform, get_indices_uniform
 
 
 @jax.jit(static_argnames=["k", "n_points"])
 def bspline(
-    control_points: Float[Array, "np1 d"],
+    control_points: ControlPoints,
     n_points: int,
-    k: int,
-    T: Float[Array, " mp1"] | None = None,
-    t: Float[Array, " n_points"] | None = None,
-) -> Float[Array, "n_points d"]:
+    k: Order,
+    T: KnotVector | None = None,
+    t: Time | None = None,
+) -> CurvePoints:
     """Evaluate a B-spline curve using de Boor's algorithm.
     Args:
         control_points: An array of shape (np1, d) representing the control points of the B-spline curve.
@@ -50,11 +51,11 @@ def bspline(
 
 @jax.jit(static_argnames=["k", "n_points", "n_fine"])
 def bspline_arclength_adjusted(
-    control_points: Float[Array, "np1 d"],
+    control_points: ControlPoints,
     n_points: int,
-    k: int,
+    k: Order,
     n_fine: int | None = None,
-) -> tuple[Float[Array, "n_points d"], Float[Array, " n_points"]]:
+) -> tuple[CurvePoints, Time]:
     """
     Compute a B-spline curve at approximately uniform arclength distribution. Evaluates B-spline function twice.
 
@@ -78,16 +79,103 @@ def bspline_arclength_adjusted(
     return bspline(control_points, n_points=n_points, k=k, t=t_new), t_new
 
 
+def chord_length_params(
+    data: Float[Array, "n d"],
+) -> Time:
+    """Chord-length parameterization of data points → t in [0, 1]."""
+    diffs = jnp.diff(data, axis=0)
+    seg_lengths = jnp.sqrt(jnp.sum(diffs**2, axis=-1))
+    cum = jnp.concatenate([jnp.zeros(1), jnp.cumsum(seg_lengths)])
+    total = cum[-1]
+    return jnp.where(total > 0, cum / total, jnp.linspace(0.0, 1.0, data.shape[0]))
+
+
+@jax.jit(static_argnames=["n_ctrl", "order"])
+def bspline_lsq_fit(
+    *,
+    data: Float[Array, "n d"],
+    n_ctrl: int,
+    order: Order = 4,
+) -> ControlPoints:
+    """Fit a B-spline with ``n_ctrl`` control points to ``data`` via weighted LSQ.
+
+    Uses chord-length parameterization and high endpoint weights so the
+    fitted curve interpolates the first and last data points exactly.
+
+    Args:
+        data: Data points of shape ``(n, d)``.
+        n_ctrl: Number of control points for the fitted B-spline.
+        order: B-spline order (4 = cubic).
+
+    Returns:
+        Fitted control points of shape ``(n_ctrl, d)``.
+    """
+    n = data.shape[0]
+    t_data = chord_length_params(data)
+
+    eye_ctrl = jnp.eye(n_ctrl)
+    B = bspline(eye_ctrl, n_points=n, k=order, t=t_data)
+
+    w = jnp.ones(n)
+    w = w.at[0].set(1e6)
+    w = w.at[-1].set(1e6)
+    W = jnp.diag(w)
+
+    BtW = B.T @ W
+    A = BtW @ B
+    rhs = BtW @ data
+
+    return jnp.linalg.solve(A, rhs)
+
+
+@jax.jit(static_argnames=["n_points", "k", "n_fine"])
+def bspline_arclength_subrange(
+    *,
+    control_points: ControlPoints,
+    n_points: int,
+    k: Order,
+    t_lo: Float[Array, ""],
+    t_hi: Float[Array, ""],
+    n_fine: int | None = None,
+) -> CurvePoints:
+    """Evaluate a B-spline with arc-length spacing over a sub-range [t_lo, t_hi].
+
+    Args:
+        control_points: Control points of shape ``(np1, d)``.
+        n_points: Number of output points.
+        k: B-spline order (4 = cubic).
+        t_lo: Start of the parameter sub-range.
+        t_hi: End of the parameter sub-range.
+        n_fine: Dense samples for arc-length estimation (default: ``n_points * 4``).
+
+    Returns:
+        Points on the B-spline with arc-length spacing over ``[t_lo, t_hi]``.
+    """
+    if n_fine is None:
+        n_fine = n_points * 4
+
+    t_fine = t_lo + (t_hi - t_lo) * jnp.linspace(0.0, 1.0, n_fine)
+    c_fine = bspline(control_points, n_points=n_fine, k=k, t=t_fine)
+
+    seg = jnp.sqrt(jnp.sum(jnp.diff(c_fine, axis=0) ** 2, axis=-1))
+    cum_arc = jnp.concatenate([jnp.zeros(1), jnp.cumsum(seg)])
+    cum_arc_norm = cum_arc / jnp.maximum(cum_arc[-1], 1e-12)
+
+    t_uniform = jnp.interp(jnp.linspace(0.0, 1.0, n_points), cum_arc_norm, t_fine)
+    t_uniform = jax.lax.stop_gradient(t_uniform)
+    return bspline(control_points, n_points=n_points, k=k, t=t_uniform)
+
+
 @jax.jit(static_argnames=["k", "n_points", "derivative_order", "emit_intermediates"])
 def bspline_derivative(
-    control_points: Float[Array, "np1 d"],
+    control_points: ControlPoints,
     n_points: int,
-    k: int,
-    T: Float[Array, " mp1"] | None = None,
-    t: Float[Array, " n_points"] | None = None,
+    k: Order,
+    T: KnotVector | None = None,
+    t: Time | None = None,
     derivative_order: int = 1,
     emit_intermediates=False,
-) -> list[Float[Array, "n_points d"]] | Float[Array, "n_points d"]:
+) -> list[CurvePoints] | CurvePoints:
     """Evaluate the derivative of a B-spline curve using de Boor's algorithm.
     Args:
         control_points: An array of shape (n+1, d) representing the control points of the B-spline curve.
