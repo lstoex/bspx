@@ -129,14 +129,10 @@ def build_alpha_lut(
 
 
 def greville_abscissae(n_ctrl: int, order: Order) -> Float[np.ndarray, " n_ctrl"]:
-    """Compute Greville abscissae for a clamped uniform B-spline.
+    """Greville abscissae for a clamped uniform B-spline.
 
-    The Greville abscissa of basis function i is the average of its k-1
-    consecutive interior knots: xi_i = mean(T[i+1 : i+k]).
-
-    Placing control points at P_i = f(xi_i) makes the B-spline exactly
-    reproduce the function f.  In particular, linearly-spaced Greville
-    values reproduce a straight line.
+    ``xi_i = mean(T[i+1 : i+k])``. Placing control points at ``P_i = f(xi_i)``
+    makes the B-spline reproduce ``f`` exactly (linearly-spaced → straight line).
     """
     n = n_ctrl - 1
     T = clamped_uniform_knot_vector(n, order)

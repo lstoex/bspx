@@ -56,26 +56,19 @@ def bspline_arclength_adjusted(
     k: Order,
     n_fine: int | None = None,
 ) -> tuple[CurvePoints, Time]:
-    """
-    Compute a B-spline curve at approximately uniform arclength distribution. Evaluates B-spline function twice.
+    """B-spline sampled at approximately uniform arc-length spacing.
 
-    Args:
-        control_points: Control points of shape (np1, d).
-        n_points: Number of arc-length-uniform output points.
-        k: B-spline order (4 = cubic).
-        n_fine: Number of dense samples for arc-length estimation (defaults to n_points if not provided).
-
-    Returns:
-        Points on the B-spline with approximately uniform arc-length spacing, and the corresponding t values used for evaluation.
+    Dense pass estimates arc length, then re-evaluates at re-parameterized t.
+    Returns ``(curve, t)``. ``n_fine`` defaults to ``n_points``.
     """
     n_fine = n_fine or n_points
-    c_fine = bspline(control_points, n_points=n_fine, k=k)  # get dense samples for arc-length estimation
+    c_fine = bspline(control_points, n_points=n_fine, k=k)
     segments = jnp.linalg.norm(jnp.diff(c_fine, axis=0), axis=-1)
     cum_len = jnp.concatenate([jnp.array([0.0]), jnp.cumsum(segments)])
-    t_old = jnp.linspace(0.0, 1.0, n_fine)  # arc-lengths correspond to these parameter values
-    normalized_length_distribution = cum_len / cum_len[-1]  # normalize to [0, 1]
-    t_new = jnp.interp(jnp.linspace(0.0, 1.0, n_points), normalized_length_distribution, t_old)  # map (t,ac) -> t_new
-    t_new = jax.lax.stop_gradient(t_new)  # Prevent gradients from flowing through the reparameterization
+    t_old = jnp.linspace(0.0, 1.0, n_fine)
+    cum_len_norm = cum_len / cum_len[-1]
+    t_new = jnp.interp(jnp.linspace(0.0, 1.0, n_points), cum_len_norm, t_old)
+    t_new = jax.lax.stop_gradient(t_new)  # block gradients through reparam
     return bspline(control_points, n_points=n_points, k=k, t=t_new), t_new
 
 
@@ -99,16 +92,8 @@ def bspline_lsq_fit(
 ) -> ControlPoints:
     """Fit a B-spline with ``n_ctrl`` control points to ``data`` via weighted LSQ.
 
-    Uses chord-length parameterization and high endpoint weights so the
-    fitted curve interpolates the first and last data points exactly.
-
-    Args:
-        data: Data points of shape ``(n, d)``.
-        n_ctrl: Number of control points for the fitted B-spline.
-        order: B-spline order (4 = cubic).
-
-    Returns:
-        Fitted control points of shape ``(n_ctrl, d)``.
+    Chord-length parameterization with high endpoint weights so the fit
+    interpolates the first and last data points.
     """
     n = data.shape[0]
     t_data = chord_length_params(data)
@@ -138,19 +123,7 @@ def bspline_arclength_subrange(
     t_hi: Float[Array, ""],
     n_fine: int | None = None,
 ) -> CurvePoints:
-    """Evaluate a B-spline with arc-length spacing over a sub-range [t_lo, t_hi].
-
-    Args:
-        control_points: Control points of shape ``(np1, d)``.
-        n_points: Number of output points.
-        k: B-spline order (4 = cubic).
-        t_lo: Start of the parameter sub-range.
-        t_hi: End of the parameter sub-range.
-        n_fine: Dense samples for arc-length estimation (default: ``n_points * 4``).
-
-    Returns:
-        Points on the B-spline with arc-length spacing over ``[t_lo, t_hi]``.
-    """
+    """B-spline with arc-length spacing over ``[t_lo, t_hi]``. ``n_fine`` defaults to ``n_points * 4``."""
     if n_fine is None:
         n_fine = n_points * 4
 

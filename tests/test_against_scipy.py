@@ -205,26 +205,18 @@ def test_constant_arclength(n, k, n_points):
 
     if k > n + 1:
         with pytest.raises(AssertionError):
-            control_points = np.random.rand(n + 1, 2)  # 2D control points
+            control_points = np.random.rand(n + 1, 2)
             _ = bspx.bspline_arclength_adjusted(control_points, n_points=n_points, k=k, n_fine=n_fine)
     else:
-        # Create random control points
-        control_points = np.random.rand(n + 1, 2)  # 2D control points
-
-        # Create our B-spline and evaluate
+        control_points = np.random.rand(n + 1, 2)
         result = bspx.bspline_arclength_adjusted(control_points, n_points=n_points, k=k, n_fine=n_fine)[0]
 
-        # compute arc lengths
         segments_after = jnp.linalg.norm(jnp.diff(result, axis=0), axis=-1)
         segments_before = jnp.linalg.norm(
             jnp.diff(bspx.bspline(control_points, n_points=n_points, k=k), axis=0), axis=-1
         )
 
-        # assert decrease in mean absolute deviation of segment lengths
+        # MAD of segment lengths should drop after arclength reparam (loose bound — exact equispacing is hard)
         mad_before = jnp.mean(jnp.abs(segments_before - jnp.mean(segments_before)))
         mad_after = jnp.mean(jnp.abs(segments_after - jnp.mean(segments_after)))
-
-        # should be much more strict but its hard
-        assert mad_after < mad_before, (
-            f"Expected MAD to decrease after arclength adjustment, but got {mad_before} before and {mad_after} after"
-        )
+        assert mad_after < mad_before, f"MAD did not drop: before={mad_before} after={mad_after}"
