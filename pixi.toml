@@ -1,0 +1,14 @@
+[package]
+name = "bspx"
+version = "0.1.0"
+
+
+[package.host-dependencies]
+
+[package.run-dependencies]
+jax = ">=0.9.0.1"
+jaxtyping = ">=0.3.5"
+numpy = ">=2.4.1"
+
+[package.build]
+backend = { name = "pixi-build-ardx", git = "ssh://git@github.com/dlr-alr/ajtools.git", subdirectory="pixi-build-ardx", branch="pixi"}
