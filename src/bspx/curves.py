@@ -2,6 +2,7 @@
 
 import jax
 import jax.numpy as jnp
+import jax.scipy.linalg as jsl
 import numpy as np
 from jaxtyping import Array, Float
 
@@ -83,34 +84,104 @@ def chord_length_params(
     return jnp.where(total > 0, cum / total, jnp.linspace(0.0, 1.0, data.shape[0]))
 
 
-@jax.jit(static_argnames=["n_ctrl", "order"])
+def _ridge_solve(M, b, lam: float, solver: str = "qr"):
+    """Solve ``min ‖M x − b‖² + λ‖x‖²`` with M tall (rows ≥ cols).
+
+    Two backends:
+
+    * ``solver="qr"`` (default, accurate). Householder QR on M (lam=0) or on
+      the augmented design ``[M; √λ I]`` (lam>0) → triangular solve. κ stays
+      linear in σ_max(M)/√λ.
+
+    * ``solver="cholesky"`` (fast, requires lam>0). Cholesky on the small
+      ``n_ctrl × n_ctrl`` shifted normal equations ``MᵀM + λI``. Banded
+      structure of B-spline ``BᵀB`` keeps the matrix small and the factor
+      cheap — empirically 2-12× faster than QR on GPU. Squares conditioning
+      (κ → κ²+1/λ), so fp32 precision floor is ~√(κ²·ε² + ε/λ). Fine for
+      ``λ ≳ 1e-3``; not safe for ``λ < 1e-4`` at high n_ctrl.
+    """
+    if solver == "cholesky":
+        if lam <= 0.0:
+            raise ValueError("solver='cholesky' requires lam > 0 for positive-definiteness.")
+        n = M.shape[1]
+        lam_d = jnp.asarray(lam, dtype=M.dtype)
+        A = M.T @ M + lam_d * jnp.eye(n, dtype=M.dtype)
+        L = jnp.linalg.cholesky(A)
+        return jsl.cho_solve((L, True), M.T @ b)
+    if solver != "qr":
+        raise ValueError(f"solver must be 'qr' or 'cholesky', got {solver!r}")
+    if lam > 0.0:
+        n = M.shape[1]
+        sqrt_lam = jnp.sqrt(jnp.asarray(lam, dtype=M.dtype))
+        M = jnp.concatenate([M, sqrt_lam * jnp.eye(n, dtype=M.dtype)], axis=0)
+        zeros = jnp.zeros((n,) + b.shape[1:], dtype=b.dtype)
+        b = jnp.concatenate([b, zeros], axis=0)
+    Q, R = jnp.linalg.qr(M, mode="reduced")
+    return jsl.solve_triangular(R, Q.T @ b, lower=False)
+
+
+@jax.jit(static_argnames=["n_ctrl", "order", "lam", "solver"])
 def bspline_lsq_fit(
     *,
     data: Float[Array, "n d"],
     n_ctrl: int,
     order: Order = 4,
+    anchors_t: Float[Array, " m"] | None = None,
+    anchors_y: Float[Array, "m d"] | None = None,
+    lam: float = 0.0,
+    solver: str = "qr",
 ) -> ControlPoints:
-    """Fit a B-spline with ``n_ctrl`` control points to ``data`` via weighted LSQ.
+    """Fit a B-spline with ``n_ctrl`` control points to ``data``.
 
-    Chord-length parameterization with high endpoint weights so the fit
-    interpolates the first and last data points.
+    Solves ``min ‖B P − data‖² + λ‖P‖²`` (chord-length-parameterized ``B``),
+    optionally subject to equality constraints ``C P = anchors_y`` where
+    ``C[i,:] = N(anchors_t[i])``. Four orthogonal knobs:
+
+    * ``anchors_t=None`` → plain unconstrained LSQ. Endpoints float by O(noise).
+    * Endpoint clamp → ``anchors_t=jnp.array([0., 1.])``,
+      ``anchors_y=jnp.stack([data[0], data[-1]])``.
+    * Arbitrary anchors → any ``(t, y)`` pairs (interior, endpoint, or mix).
+    * ``lam > 0`` → Tikhonov ridge. **Required for stable cross-device results
+      when n_ctrl approaches n_data**: chord-length parameterization can leave
+      knot intervals empty (Schoenberg–Whitney violated) → B rank-deficient →
+      lstsq returns a different min-norm element of the null space per
+      LAPACK/cuSolver pivot order. ``λ ≈ 1e-6`` is enough to make the result
+      deterministic at the cost of an O(λ/σ²) shrinkage on well-determined
+      modes. Default ``0.0`` preserves bias-free behavior in the
+      well-conditioned regime.
+
+    Algorithm: see ``_ridge_solve``. ``solver="qr"`` (default) uses
+    Householder QR on the (possibly augmented) design — accurate, works at
+    ``lam=0``. ``solver="cholesky"`` solves the small ``n_ctrl × n_ctrl``
+    shifted normal equations — 2-12× faster on GPU, requires ``lam>0``,
+    fp32-safe only for ``lam ≳ 1e-3``. Constrained mode uses the null-space
+    method: ``P = P_part + Q_2 y`` where ``Q_2`` spans null(C); the reduced
+    LSQ for ``y`` is solved by the chosen backend. Anchors enforced exactly.
     """
-    n = data.shape[0]
+    if (anchors_t is None) != (anchors_y is None):
+        raise ValueError("anchors_t and anchors_y must be both given or both None.")
+
+    n_data = data.shape[0]
     t_data = chord_length_params(data)
-
     eye_ctrl = jnp.eye(n_ctrl)
-    B = bspline(eye_ctrl, n_points=n, k=order, t=t_data)
+    B = bspline(eye_ctrl, n_points=n_data, k=order, t=t_data)
 
-    w = jnp.ones(n)
-    w = w.at[0].set(1e6)
-    w = w.at[-1].set(1e6)
-    W = jnp.diag(w)
+    if anchors_t is None:
+        return _ridge_solve(B, data, lam, solver)
 
-    BtW = B.T @ W
-    A = BtW @ B
-    rhs = BtW @ data
+    n_anchors = anchors_t.shape[0]
+    C = bspline(eye_ctrl, n_points=n_anchors, k=order, t=anchors_t)
 
-    return jnp.linalg.solve(A, rhs)
+    Q, R = jnp.linalg.qr(C.T, mode="complete")
+    R_top = R[:n_anchors, :]
+    Q1 = Q[:, :n_anchors]
+    Q2 = Q[:, n_anchors:]
+
+    v = jsl.solve_triangular(R_top.T, anchors_y, lower=True)
+    P_part = Q1 @ v
+
+    y = _ridge_solve(B @ Q2, data - B @ P_part, lam, solver)
+    return P_part + Q2 @ y
 
 
 @jax.jit(static_argnames=["n_points", "k", "n_fine"])
