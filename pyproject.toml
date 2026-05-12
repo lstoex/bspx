@@ -19,6 +19,10 @@ dependencies = [
 requires = ["uv_build>=0.9.26,<0.10.0"]
 build-backend = "uv_build"
 
+[tool.uv.build-backend]
+module-name = "bspx"
+module-root = ""
+
 [dependency-groups]
 dev = [
     "ipykernel>=7.1.0",
@@ -46,5 +50,5 @@ ignore = ["F722"]
 
 [tool.ty.src]
 # Remove `build` from the excluded directories.
-include = ["src/", "tests/"]
+include = ["bspx/", "tests/"]
 exclude = [".venv/"]
