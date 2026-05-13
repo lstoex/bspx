@@ -12,4 +12,4 @@ numpy = ">=2.4.1"
 
 [package.build]
 # backend = { name = "pixi-build-ardx", git = "ssh://git@github.com/dlr-alr/ajtools.git", subdirectory="pixi-build-ardx", branch="pixi"}
-backend = { name = "pixi-build-ardx", path = "../ajtools/pixi-build-ardx" }
+backend = { name = "pixi-build-ardx", version = "*" }
